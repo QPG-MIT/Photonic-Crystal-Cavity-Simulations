@@ -19,7 +19,7 @@ import tidy3d as td
 from numpy import pi, trapezoid
 from pathlib import Path
 from dataclasses import dataclass
-from .plot_style import apply_theme
+from .plot_style import apply_theme, PALETTE
 from typing import Dict, List, Tuple, Optional, Any
 import warnings
 
@@ -342,9 +342,13 @@ class PolarizationAnalyzer:
         
         fig, axs = plt.subplots(1, 3, figsize=(16, 4.5), sharex=True, sharey=True)
         
+        # Create consistent colormap from palette
+        from matplotlib.colors import LinearSegmentedColormap
+        consistent_cmap = LinearSegmentedColormap.from_list('consistent', [PALETTE[0], PALETTE[1], PALETTE[2]])
+        
         # S0 (power)
         im1 = axs[0].pcolormesh(phi_deg, theta_deg, S0/np.max(S0), 
-                               shading="auto", cmap="viridis")
+                               shading="auto", cmap=consistent_cmap)
         axs[0].set_title("S0 (power, normalized)")
         axs[0].set_xlabel("φ (deg)")
         axs[0].set_ylabel("θ (deg)")
@@ -353,7 +357,7 @@ class PolarizationAnalyzer:
         
         # DoLP
         im2 = axs[1].pcolormesh(phi_deg, theta_deg, DoLP, 
-                               shading="auto", cmap="viridis")
+                               shading="auto", cmap=consistent_cmap)
         axs[1].set_title("DoLP")
         axs[1].set_xlabel("φ (deg)")
         axs[1].set_ylabel("θ (deg)")
@@ -362,7 +366,7 @@ class PolarizationAnalyzer:
         
         # DoCP
         im3 = axs[2].pcolormesh(phi_deg, theta_deg, DoCP, 
-                               shading="auto", cmap="viridis")
+                               shading="auto", cmap=consistent_cmap)
         axs[2].set_title("DoCP")
         axs[2].set_xlabel("φ (deg)")
         axs[2].set_ylabel("θ (deg)")
@@ -377,7 +381,8 @@ class PolarizationAnalyzer:
     def plot_azimuthal_averages(self, res: FarfieldSummary, save_prefix: str = "polarization") -> None:
         """Plot azimuthal averages of polarization properties."""
         print(f"\n📊 Creating azimuthal averages...")
-        apply_theme()
+        # Use default matplotlib style for linear plots (common Jupyter style)
+        plt.style.use('default')
         
         S0 = res.per_angle["S0"]
         S1 = res.per_angle["S1"]
@@ -397,9 +402,9 @@ class PolarizationAnalyzer:
         DoP_t = np.sqrt(S1_t**2 + S2_t**2 + S3_t**2) / np.maximum(S0_t, 1e-30)
         
         plt.figure(figsize=(6.5, 4.2))
-        plt.plot(np.rad2deg(theta2d[:, 0]), DoLP_t, label="DoLP")
-        plt.plot(np.rad2deg(theta2d[:, 0]), DoCP_t, label="DoCP")
-        plt.plot(np.rad2deg(theta2d[:, 0]), DoP_t, label="DoP", linestyle="--")
+        plt.plot(np.rad2deg(theta2d[:, 0]), DoLP_t, label="DoLP", color=PALETTE[0])
+        plt.plot(np.rad2deg(theta2d[:, 0]), DoCP_t, label="DoCP", color=PALETTE[1])
+        plt.plot(np.rad2deg(theta2d[:, 0]), DoP_t, label="DoP", linestyle="--", color=PALETTE[2])
         plt.axvline(np.rad2deg(res.theta_max), color="k", ls=":", label="θ_max (NA)")
         plt.xlabel("θ (deg)")
         plt.ylabel("degree")
@@ -422,9 +427,13 @@ class PolarizationAnalyzer:
         uy = np.sin(theta2d) * np.sin(phi2d)
         I = S0 / (np.max(S0) + 1e-30)
         
+        # Create consistent colormap from palette
+        from matplotlib.colors import LinearSegmentedColormap
+        bfp_cmap = LinearSegmentedColormap.from_list('bfp', [PALETTE[0], PALETTE[1], PALETTE[2]])
+        
         plt.figure(figsize=(5.5, 5.2))
         if scatter:
-            plt.scatter(ux.flatten(), uy.flatten(), c=I.flatten(), s=8, cmap="magma")
+            plt.scatter(ux.flatten(), uy.flatten(), c=I.flatten(), s=8, cmap=bfp_cmap)
         else:
             # Interpolate to regular grid
             from scipy.interpolate import griddata
@@ -434,17 +443,17 @@ class PolarizationAnalyzer:
             GX, GY = np.meshgrid(gx, gy, indexing="xy")
             GI = griddata((ux.flatten(), uy.flatten()), I.flatten(), (GX, GY),
                          method="linear", fill_value=np.nan)
-            im = plt.imshow(GI, extent=[-1, 1, -1, 1], origin="lower", cmap="magma")
-            plt.colorbar(im, label="S0 (norm.)")
+            im = plt.imshow(GI, extent=[-1, 1, -1, 1], origin="lower", cmap=bfp_cmap)
+            plt.colorbar(im, label="S₀ (norm.)")
         
         circle = plt.Circle((0, 0), res.NA/res.n_bg, color="w", fill=False, lw=1.2)
         plt.gca().add_artist(circle)
         plt.gca().set_aspect("equal", adjustable="box")
-        plt.xlabel("u_x = sinθ cosφ")
-        plt.ylabel("u_y = sinθ sinφ")
+        plt.xlabel("uₓ = sinθ cosφ")
+        plt.ylabel("uᵧ = sinθ sinφ")
         plt.title("Back Focal Plane (normalized)")
         if scatter:
-            plt.colorbar(label="S0 (norm.)")
+            plt.colorbar(label="S₀ (norm.)")
         plt.tight_layout()
         plt.savefig(f"{save_prefix}_bfp.png", dpi=160, bbox_inches="tight")
         plt.show()
@@ -468,16 +477,20 @@ class PolarizationAnalyzer:
         dx = scale * np.cos(psi_s)
         dy = scale * np.sin(psi_s)
         
+        # Create consistent colormap from palette for quiver plot
+        from matplotlib.colors import LinearSegmentedColormap
+        quiver_cmap = LinearSegmentedColormap.from_list('quiver', [PALETTE[3], PALETTE[4], PALETTE[5]])
+        
         plt.figure(figsize=(6, 6))
         plt.quiver(ux_s, uy_s, dx, dy, np.tanh(2*chi_s), angles="xy",
-                  scale_units="xy", scale=1.0, cmap="coolwarm", width=0.004)
+                  scale_units="xy", scale=1.0, cmap=quiver_cmap, width=0.004)
         plt.colorbar(label="tanh(2χ) ~ ellipticity")
         circle = plt.Circle((0, 0), res.NA/res.n_bg, color="k", fill=False, lw=1.0)
         plt.gca().add_artist(circle)
         plt.gca().set_aspect("equal", adjustable="box")
         plt.title("BFP polarization: orientation (arrows) & ellipticity (color)")
-        plt.xlabel("u_x")
-        plt.ylabel("u_y")
+        plt.xlabel("uₓ")
+        plt.ylabel("uᵧ")
         plt.tight_layout()
         plt.savefig(f"{save_prefix}_bfp_quiver.png", dpi=160, bbox_inches="tight")
         plt.show()
