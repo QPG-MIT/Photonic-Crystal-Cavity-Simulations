@@ -54,6 +54,14 @@ Previous/
 *.tmp
 *.temp
 
+# Analysis results and visualizations (generated files)
+*.png
+*_results.json
+*_analysis_results.json
+*_analysis_report.json
+*_report.json
+*_summary.json
+
 # Include only essential files by explicitly tracking them
 # The following files will be tracked:
 # - modules/ (all Python files)

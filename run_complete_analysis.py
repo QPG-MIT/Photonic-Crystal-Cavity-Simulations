@@ -40,7 +40,8 @@ def run_complete_analysis():
         'wavelength_um': 0.62,
         'thickness_um': 0.14,
         'NA': 0.9,
-        'n_bg': 1.0
+        'n_bg': 1.0,
+        'n_emitter': 2.414
     }
     
     print(f"Configuration:")
@@ -92,7 +93,7 @@ def run_complete_analysis():
             thickness_um=CONFIG['thickness_um'],
             wavelength_um=CONFIG['wavelength_um'],
             Q=Q,
-            n_bg=CONFIG['n_bg'],
+            n_emitter=CONFIG['n_emitter'],
             save_results=True,
             create_plots=True
         )

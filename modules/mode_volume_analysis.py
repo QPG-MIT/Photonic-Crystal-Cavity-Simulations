@@ -22,6 +22,8 @@ from matplotlib.path import Path as MPLPath
 from typing import Dict, Tuple, Optional, Any
 import warnings
 
+from .plot_style import apply_theme, PALETTE
+
 # Suppress warnings for cleaner output
 warnings.filterwarnings('ignore')
 
@@ -248,7 +250,7 @@ class ModeVolumeAnalyzer:
     
     def compute_purcell_factor(self, V_eff: float, Q: float, 
                               wavelength_um: Optional[float] = None,
-                              n_bg: float = 1.0) -> float:
+                              n_emitter: float = 2.414) -> float:
         """
         Compute Purcell factor for a quantum emitter.
         
@@ -256,7 +258,7 @@ class ModeVolumeAnalyzer:
             V_eff: Effective mode volume in m³
             Q: Quality factor
             wavelength_um: Wavelength in micrometers (uses class default if None)
-            n_bg: Background refractive index for emitter
+            n_emitter: Refractive index of emitter environment (diamond)
             
         Returns:
             Purcell factor
@@ -268,11 +270,11 @@ class ModeVolumeAnalyzer:
         wavelength = wavelength_um * 1e-6
         
         # Purcell factor formula: F = (3/4π²) * (λ/n)³ * (Q/V_eff)
-        F = (3.0 / (4.0 * np.pi**2)) * (wavelength / n_bg)**3 * (Q / V_eff)
+        F = (3.0 / (4.0 * np.pi**2)) * (wavelength / n_emitter)**3 * (Q / V_eff)
         
         print(f"\n🎯 Purcell Factor Analysis")
         print(f"  - Wavelength: {wavelength_um:.3f} µm")
-        print(f"  - Background index: {n_bg:.3f}")
+        print(f"  - Emitter environment index: {n_emitter:.3f}")
         print(f"  - Quality factor: {Q:.0f}")
         print(f"  - Mode volume: {V_eff*1e18:.3f} µm³")
         print(f"  - Purcell factor: {F:.2f}")
@@ -282,7 +284,7 @@ class ModeVolumeAnalyzer:
     def analyze_mode_volume(self, data: td.SimulationData,
                           monitor_name: str = "fld_3d_box",
                           Q: Optional[float] = None,
-                          n_bg: float = 1.0) -> Dict:
+                          n_emitter: float = 2.414) -> Dict:
         """
         Perform complete mode volume analysis.
         
@@ -290,7 +292,7 @@ class ModeVolumeAnalyzer:
             data: Tidy3D simulation data
             monitor_name: Name of 3D field monitor
             Q: Quality factor (optional, for Purcell calculation)
-            n_bg: Background refractive index for Purcell calculation
+            n_emitter: Refractive index of emitter environment for Purcell calculation
             
         Returns:
             Dictionary with analysis results
@@ -311,7 +313,7 @@ class ModeVolumeAnalyzer:
         # Compute Purcell factor if Q is provided
         F = None
         if Q is not None:
-            F = self.compute_purcell_factor(V_eff, Q, n_bg=n_bg)
+            F = self.compute_purcell_factor(V_eff, Q, n_emitter=n_emitter)
         
         # Compile results
         results = {
@@ -320,7 +322,7 @@ class ModeVolumeAnalyzer:
             'purcell_factor': F,
             'quality_factor': Q,
             'wavelength_um': self.wavelength_um,
-            'background_index': n_bg,
+            'emitter_environment_index': n_emitter,
             'core_index': self.n_core,
             'cladding_index': self.n_clad,
             'thickness_um': self.thickness_um,
@@ -338,7 +340,7 @@ class ModeVolumeAnalyzer:
                                x: np.ndarray, y: np.ndarray, z: np.ndarray,
                                eps: np.ndarray, save_file: str = "mode_volume_field.png") -> None:
         """
-        Plot 3D field distribution and permittivity map.
+        Plot 3D field distribution with structure outlines in linear and log scales.
         
         Args:
             Ex, Ey, Ez: Electric field components
@@ -347,7 +349,8 @@ class ModeVolumeAnalyzer:
             save_file: Output filename for plot
         """
         print(f"\n📊 Creating field distribution plots...")
-        
+        apply_theme()
+
         # Compute field intensity
         E_squared = np.abs(Ex)**2 + np.abs(Ey)**2 + np.abs(Ez)**2
         
@@ -356,64 +359,128 @@ class ModeVolumeAnalyzer:
         j_center = len(y) // 2
         k_center = len(z) // 2
         
-        fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+        # Create figure with 1 row x 3 columns
+        fig, axes = plt.subplots(1, 3, figsize=(18, 6))
         
-        # XY plane (z=0)
-        im1 = axes[0, 0].imshow(E_squared[k_center, :, :], 
-                               extent=[x.min()*1e6, x.max()*1e6, y.min()*1e6, y.max()*1e6],
-                               origin='lower', cmap='hot', aspect='auto')
-        axes[0, 0].set_title('Field Intensity (XY plane)')
-        axes[0, 0].set_xlabel('x (µm)')
-        axes[0, 0].set_ylabel('y (µm)')
-        plt.colorbar(im1, ax=axes[0, 0], label='|E|²')
+        # Calculate colormap limits for better visibility (crop to show 1-99th percentile)
+        vmin_linear = np.percentile(E_squared, 0.01)
+        vmax_linear = np.percentile(E_squared, 99.99)
         
-        # XZ plane (y=0)
-        im2 = axes[0, 1].imshow(E_squared[:, j_center, :], 
-                               extent=[x.min()*1e6, x.max()*1e6, z.min()*1e6, z.max()*1e6],
-                               origin='lower', cmap='hot', aspect='auto')
-        axes[0, 1].set_title('Field Intensity (XZ plane)')
-        axes[0, 1].set_xlabel('x (µm)')
-        axes[0, 1].set_ylabel('z (µm)')
-        plt.colorbar(im2, ax=axes[0, 1], label='|E|²')
+        # Field intensity plots
+        # XY plane (z=0) - Top view
+        im1 = axes[0].imshow(E_squared[k_center, :, :], 
+                            extent=[x.min()*1e6, x.max()*1e6, y.min()*1e6, y.max()*1e6],
+                            origin='lower', cmap='plasma', aspect='auto', alpha=0.8,
+                            vmin=vmin_linear, vmax=vmax_linear)
+        axes[0].set_title('Top View (XY plane)', fontsize=14, fontweight='bold')
+        axes[0].set_xlabel('x (µm)')
+        axes[0].set_ylabel('y (µm)')
+        axes[0].grid(False)  # Remove grid
+        plt.colorbar(im1, ax=axes[0], label='|E|²')
         
-        # YZ plane (x=0)
-        im3 = axes[0, 2].imshow(E_squared[:, :, i_center], 
-                               extent=[y.min()*1e6, y.max()*1e6, z.min()*1e6, z.max()*1e6],
-                               origin='lower', cmap='hot', aspect='auto')
-        axes[0, 2].set_title('Field Intensity (YZ plane)')
-        axes[0, 2].set_xlabel('y (µm)')
-        axes[0, 2].set_ylabel('z (µm)')
-        plt.colorbar(im3, ax=axes[0, 2], label='|E|²')
+        # Add structure outline for XY plane using permittivity map
+        self._add_structure_outline_xy(axes[0], eps[k_center, :, :], x, y)
         
-        # Permittivity maps
-        im4 = axes[1, 0].imshow(eps[k_center, :, :], 
-                               extent=[x.min()*1e6, x.max()*1e6, y.min()*1e6, y.max()*1e6],
-                               origin='lower', cmap='viridis', aspect='auto')
-        axes[1, 0].set_title('Permittivity (XY plane)')
-        axes[1, 0].set_xlabel('x (µm)')
-        axes[1, 0].set_ylabel('y (µm)')
-        plt.colorbar(im4, ax=axes[1, 0], label='ε')
+        # XZ plane (y=0) - Side view
+        im2 = axes[1].imshow(E_squared[:, j_center, :], 
+                            extent=[x.min()*1e6, x.max()*1e6, z.min()*1e6, z.max()*1e6],
+                            origin='lower', cmap='plasma', aspect='auto', alpha=0.8,
+                            vmin=vmin_linear, vmax=vmax_linear)
+        axes[1].set_title('Side View (XZ plane)', fontsize=14, fontweight='bold')
+        axes[1].set_xlabel('x (µm)')
+        axes[1].set_ylabel('z (µm)')
+        axes[1].grid(False)  # Remove grid
+        plt.colorbar(im2, ax=axes[1], label='|E|²')
         
-        im5 = axes[1, 1].imshow(eps[:, j_center, :], 
-                               extent=[x.min()*1e6, x.max()*1e6, z.min()*1e6, z.max()*1e6],
-                               origin='lower', cmap='viridis', aspect='auto')
-        axes[1, 1].set_title('Permittivity (XZ plane)')
-        axes[1, 1].set_xlabel('x (µm)')
-        axes[1, 1].set_ylabel('z (µm)')
-        plt.colorbar(im5, ax=axes[1, 1], label='ε')
+        # Add structure outline for XZ plane
+        self._add_structure_outline_xz(axes[1], eps[:, j_center, :], x, z)
         
-        im6 = axes[1, 2].imshow(eps[:, :, i_center], 
-                               extent=[y.min()*1e6, y.max()*1e6, z.min()*1e6, z.max()*1e6],
-                               origin='lower', cmap='viridis', aspect='auto')
-        axes[1, 2].set_title('Permittivity (YZ plane)')
-        axes[1, 2].set_xlabel('y (µm)')
-        axes[1, 2].set_ylabel('z (µm)')
-        plt.colorbar(im6, ax=axes[1, 2], label='ε')
+        # YZ plane (x=0) - Front view
+        im3 = axes[2].imshow(E_squared[:, :, i_center], 
+                            extent=[y.min()*1e6, y.max()*1e6, z.min()*1e6, z.max()*1e6],
+                            origin='lower', cmap='plasma', aspect='auto', alpha=0.8,
+                            vmin=vmin_linear, vmax=vmax_linear)
+        axes[2].set_title('Front View (YZ plane)', fontsize=14, fontweight='bold')
+        axes[2].set_xlabel('y (µm)')
+        axes[2].set_ylabel('z (µm)')
+        axes[2].grid(False)  # Remove grid
+        plt.colorbar(im3, ax=axes[2], label='|E|²')
+        
+        # Add structure outline for YZ plane
+        self._add_structure_outline_yz(axes[2], eps[:, :, i_center], y, z)
+        
         
         plt.tight_layout()
         plt.savefig(save_file, dpi=150, bbox_inches='tight')
         plt.show()
         print(f"✓ Field distribution plots saved to {save_file}")
+    
+    def _add_structure_outline_xy(self, ax, eps_slice, x, y):
+        """Add structure outline to XY plane using permittivity slice."""
+        from skimage import measure
+        
+        # Find contours where permittivity changes significantly
+        # Use a threshold between air and silicon permittivity
+        eps_threshold = (self.n_clad**2 + self.n_core**2) / 2
+        
+        try:
+            contours = measure.find_contours(eps_slice, eps_threshold)
+            
+            for contour in contours:
+                if len(contour) > 10:  # Only plot substantial contours
+                    # Convert contour indices to physical coordinates
+                    y_coords = y[contour[:, 0].astype(int)]
+                    x_coords = x[contour[:, 1].astype(int)]
+                    
+                    # Classify as cavity (high permittivity) or hole (low permittivity)
+                    avg_eps = np.mean(eps_slice[contour[:, 0].astype(int), contour[:, 1].astype(int)])
+                    
+                    if avg_eps > eps_threshold * 1.2:  # Cavity
+                        ax.plot(x_coords*1e6, y_coords*1e6, 'w-', linewidth=2, alpha=0.8)
+                    else:  # Hole
+                        ax.plot(x_coords*1e6, y_coords*1e6, 'w-', linewidth=1, alpha=0.6)
+        except Exception as e:
+            print(f"Warning: Could not add structure outline to XY plane: {e}")
+    
+    def _add_structure_outline_xz(self, ax, eps_slice, x, z):
+        """Add structure outline to XZ plane using permittivity slice."""
+        from skimage import measure
+        
+        eps_threshold = (self.n_clad**2 + self.n_core**2) / 2
+        
+        try:
+            contours = measure.find_contours(eps_slice, eps_threshold)
+            
+            for contour in contours:
+                if len(contour) > 10:
+                    # Convert contour indices to physical coordinates
+                    z_coords = z[contour[:, 0].astype(int)]
+                    x_coords = x[contour[:, 1].astype(int)]
+                    
+                    # For XZ plane, we plot the top and bottom boundaries
+                    ax.plot(x_coords*1e6, z_coords*1e6, 'w-', linewidth=2, alpha=0.8)
+        except Exception as e:
+            print(f"Warning: Could not add structure outline to XZ plane: {e}")
+    
+    def _add_structure_outline_yz(self, ax, eps_slice, y, z):
+        """Add structure outline to YZ plane using permittivity slice."""
+        from skimage import measure
+        
+        eps_threshold = (self.n_clad**2 + self.n_core**2) / 2
+        
+        try:
+            contours = measure.find_contours(eps_slice, eps_threshold)
+            
+            for contour in contours:
+                if len(contour) > 10:
+                    # Convert contour indices to physical coordinates
+                    z_coords = z[contour[:, 0].astype(int)]
+                    y_coords = y[contour[:, 1].astype(int)]
+                    
+                    # For YZ plane, we plot the top and bottom boundaries
+                    ax.plot(y_coords*1e6, z_coords*1e6, 'w-', linewidth=2, alpha=0.8)
+        except Exception as e:
+            print(f"Warning: Could not add structure outline to YZ plane: {e}")
     
     def save_results(self, results: Dict, filename: str = "mode_volume_results.json") -> None:
         """Save analysis results to file."""
@@ -432,7 +499,7 @@ def analyze_mode_volume(data_path: str,
                        wavelength_um: float = 0.62,
                        monitor_name: str = "fld_3d_box",
                        Q: Optional[float] = None,
-                       n_bg: float = 1.0,
+                       n_emitter: float = 2.414,
                        save_results: bool = True,
                        create_plots: bool = True) -> Dict:
     """
@@ -446,7 +513,7 @@ def analyze_mode_volume(data_path: str,
         wavelength_um: Analysis wavelength in micrometers
         monitor_name: Name of 3D field monitor
         Q: Quality factor (optional, for Purcell calculation)
-        n_bg: Background refractive index for Purcell calculation
+        n_emitter: Refractive index of emitter environment for Purcell calculation
         save_results: Whether to save results to file
         create_plots: Whether to create visualization plots
         
@@ -465,7 +532,7 @@ def analyze_mode_volume(data_path: str,
     )
     
     # Perform analysis
-    results = analyzer.analyze_mode_volume(data, monitor_name=monitor_name, Q=Q, n_bg=n_bg)
+    results = analyzer.analyze_mode_volume(data, monitor_name=monitor_name, Q=Q, n_emitter=n_emitter)
     
     # Create plots if requested
     if create_plots:
@@ -485,17 +552,17 @@ if __name__ == "__main__":
     import sys
     
     if len(sys.argv) < 2:
-        print("Usage: python mode_volume_analysis.py <data_file.hdf5> [Q_factor] [n_bg]")
+        print("Usage: python mode_volume_analysis.py <data_file.hdf5> [Q_factor] [n_emitter]")
         sys.exit(1)
     
     data_file = sys.argv[1]
     Q = float(sys.argv[2]) if len(sys.argv) > 2 else None
-    n_bg = float(sys.argv[3]) if len(sys.argv) > 3 else 1.0
+    n_emitter = float(sys.argv[3]) if len(sys.argv) > 3 else 2.414
     
     results = analyze_mode_volume(
         data_path=data_file,
         Q=Q,
-        n_bg=n_bg,
+        n_emitter=n_emitter,
         save_results=True,
         create_plots=True
     )
