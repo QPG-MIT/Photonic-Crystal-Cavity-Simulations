@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.env
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Project specific - exclude Previous directory and other non-essential files
+Previous/
+*.log
+*.tmp
+*.temp
+
+# Include only essential files by explicitly tracking them
+# The following files will be tracked:
+# - modules/ (all Python files)
+# - *.gds files
+# - *.ipynb files
+# - results_*.hdf5 files
+# - run_complete_analysis.py
+# - requirements.txt
+# - README.md (if created)
