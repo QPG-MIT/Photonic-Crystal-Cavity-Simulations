@@ -23,6 +23,8 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Any
 import warnings
 
+from .plot_style import apply_theme
+
 # Suppress warnings for cleaner output
 warnings.filterwarnings('ignore')
 

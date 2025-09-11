@@ -22,6 +22,8 @@ from matplotlib.path import Path as MPLPath
 from typing import Dict, Tuple, Optional, Any
 import warnings
 
+from .plot_style import apply_theme
+
 # Suppress warnings for cleaner output
 warnings.filterwarnings('ignore')
 
