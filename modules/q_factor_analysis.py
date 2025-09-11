@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Any
 import warnings
 
-from .plot_style import apply_theme
+from .plot_style import apply_theme, PALETTE
 
 # Suppress warnings for cleaner output
 warnings.filterwarnings('ignore')
@@ -536,28 +536,57 @@ class QFactorAnalyzer:
                                t: np.ndarray, z: np.ndarray, ref: Dict, i0: int) -> None:
         """Create ringdown analysis plots."""
         apply_theme()
-        plt.figure(figsize=(12, 4.8))
-        
-        # Plot full signal
-        plt.semilogy(t_all*1e12, np.abs(hilbert(y_all)), alpha=0.7, 
-                    linewidth=0.8, label='Full signal')
-        
-        # Plot tail segment
-        plt.semilogy(t*1e12, np.abs(z), linewidth=1.3, label='Analysis tail')
-        
-        # Plot model
-        plt.semilogy(t*1e12, np.abs(ref['model']), '--', linewidth=1.8, 
-                    label=f'Model (K={len(ref["f"])})')
-        
+        plt.figure(figsize=(12, 5.5))
+
+        # Colors from shared palette
+        c_full = PALETTE[0]   # blue
+        c_tail = PALETTE[1]   # orange
+        c_model = PALETTE[3]  # red
+        c_mark = PALETTE[2]   # green
+
+        # Compute envelopes
+        env_full = np.abs(hilbert(y_all)) + 1e-30
+        env_tail = np.abs(z) + 1e-30
+
+        # Plot full-signal envelope
+        plt.semilogy(t_all*1e12, env_full, color=c_full, alpha=0.7,
+                     linewidth=1.0, label='Full signal envelope |E|(t)')
+
+        # Plot tail segment used for fitting
+        plt.semilogy(t*1e12, env_tail, color=c_tail, linewidth=1.6,
+                     label='Tail used for fit')
+
+        # Plot fitted model envelope
+        plt.semilogy(t*1e12, np.abs(ref['model']), linestyle='--', color=c_model,
+                     linewidth=2.0, label=f'Fitted model (K={len(ref["f"])})')
+
         # Mark tail start
-        plt.axvline(t_all[i0]*1e12, linestyle=':', linewidth=0.9, 
-                   label='Tail start')
-        
+        plt.axvline(t_all[i0]*1e12, color=c_mark, linestyle=':', linewidth=1.2,
+                    label='Tail start index')
+
+        # Labels and title
         plt.xlabel("Time (ps)")
-        plt.ylabel("|E| (log scale)")
-        plt.title("Ringdown Analysis: Multi-mode Fit with Variable Projection")
-        plt.legend(frameon=False, fontsize=9)
-        plt.grid(True, alpha=0.3)
+        plt.ylabel("|E|(t) [arb.] (log scale)")
+        plt.title("Q-factor ringdown: tail fit with variable projection")
+
+        # Annotation with per-mode Q and tau
+        f = np.atleast_1d(ref['f'])
+        a = np.atleast_1d(ref['a'])
+        tau_ps = (1.0/np.maximum(a, 1e-30)) * 1e12
+        Q_vals = np.pi * f / np.maximum(a, 1e-30)
+        # Calculate resonance wavelength(s) in nanometers: lambda_nm = (c / f) * 1e9
+        lambda_nm = (C0 / np.atleast_1d(f)) * 1e9
+        lines = [
+            fr"Mode {k+1}: Q={Q_vals[k]:,.0f}, $\tau$={tau_ps[k]:.2f} ps, $\lambda$={lambda_nm[k]:.1f} nm"
+            for k in range(len(f))
+        ]
+        text = "\n".join(lines)
+        # Place text in upper-right inside axes
+        plt.gca().text(0.98, 0.98, text,
+                       ha='right', va='top', transform=plt.gca().transAxes,
+                       fontsize=10, color='k', bbox=dict(facecolor='white', alpha=0.75, edgecolor='none'))
+
+        plt.legend(frameon=False, fontsize=10, loc='lower right')
         plt.tight_layout()
         plt.savefig('q_factor_analysis.png', dpi=150, bbox_inches='tight')
         plt.show()

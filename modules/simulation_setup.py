@@ -423,78 +423,41 @@ class SimulationSetup:
         print(f"  - Size: {Path(filename).stat().st_size / 1024:.1f} KB")
     
     def visualize_simulation(self, simulation: td.Simulation) -> None:
-        """Visualize the simulation setup with nearfield and farfield projections."""
+        """Visualize the simulation setup with a simplified geometry view."""
         print("\n📊 Visualizing simulation setup...")
-        
+
         apply_theme()
-        
-        # Create Nearfield Figure
-        print("  - Creating nearfield visualization...")
-        fig_near = plt.figure(figsize=(16, 12), constrained_layout=False)
-        
-        # Outer: 1 row × 2 cols (right spans both rows conceptually)
-        outer = fig_near.add_gridspec(nrows=1, ncols=2, width_ratios=[1, 1], wspace=0.12)
-        
-        # LEFT column: its own 2×1 subgrid with some vertical gap
+
+        # Create single consolidated geometry visualization (nearfield planes)
+        print("  - Creating simulation visualization...")
+        fig = plt.figure(figsize=(16, 12), constrained_layout=False)
+
+        # Layout: left column (XY and XZ), right column (YZ)
+        outer = fig.add_gridspec(nrows=1, ncols=2, width_ratios=[1, 1], wspace=0.12)
         left = outer[0].subgridspec(nrows=2, ncols=1, hspace=0.15)
-        
+
         # XY plane (z=0) - top view
-        ax_xy = fig_near.add_subplot(left[0])
+        ax_xy = fig.add_subplot(left[0])
         simulation.plot(z=0, ax=ax_xy)
         ax_xy.set_title('XY Plane (z=0) - Top View', pad=1, fontsize=14, fontweight='bold')
-        ax_xy.set_aspect('auto')  # Use auto instead of equal
-        
+        ax_xy.set_aspect('auto')
+
         # XZ plane (y=0) - side view
-        ax_xz = fig_near.add_subplot(left[1], sharex=ax_xy)
+        ax_xz = fig.add_subplot(left[1], sharex=ax_xy)
         simulation.plot(y=0, ax=ax_xz)
         ax_xz.set_title('XZ Plane (y=0) - Side View', pad=1, fontsize=14, fontweight='bold')
-        ax_xz.set_aspect('auto')  # Use auto instead of equal
-        
-        # RIGHT column: single axis spanning full height
-        ax_yz = fig_near.add_subplot(outer[1])
+        ax_xz.set_aspect('auto')
+
+        # YZ plane (x=0) - front view
+        ax_yz = fig.add_subplot(outer[1])
         simulation.plot(x=0, ax=ax_yz)
         ax_yz.set_title('YZ Plane (x=0) - Front View', pad=2, fontsize=14, fontweight='bold')
-        ax_yz.set_aspect('auto')  # Use auto instead of equal
-        
-        # No tight_layout; just small outer margins
-        fig_near.subplots_adjust(left=0.06, right=0.98, top=0.96, bottom=0.06)
-        plt.savefig('simulation_setup_nearfield.png', dpi=150, bbox_inches='tight')
+        ax_yz.set_aspect('auto')
+
+        fig.subplots_adjust(left=0.06, right=0.98, top=0.96, bottom=0.06)
+        plt.savefig('simulation_setup.png', dpi=150, bbox_inches='tight')
         plt.show()
-        print("✓ Nearfield visualization saved to simulation_setup_nearfield.png")
-        
-        # Create Farfield Figure
-        print("  - Creating farfield visualization...")
-        fig_far = plt.figure(figsize=(16, 12), constrained_layout=False)
-        
-        # Outer: 1 row × 2 cols (right spans both rows conceptually)
-        outer = fig_far.add_gridspec(nrows=1, ncols=2, width_ratios=[1, 1], wspace=0.12)
-        
-        # LEFT column: its own 2×1 subgrid with some vertical gap
-        left = outer[0].subgridspec(nrows=2, ncols=1, hspace=0.15)
-        
-        # XY plane at z=1.5 (far-field monitor level)
-        ax_xy_far = fig_far.add_subplot(left[0])
-        simulation.plot(z=1.5, ax=ax_xy_far)
-        ax_xy_far.set_title('XY Plane (z=1.5) - Far-Field Level', pad=1, fontsize=14, fontweight='bold')
-        ax_xy_far.set_aspect('auto')  # Use auto instead of equal
-        
-        # XZ plane at y=0 with far-field monitors
-        ax_xz_far = fig_far.add_subplot(left[1], sharex=ax_xy_far)
-        simulation.plot(y=0, ax=ax_xz_far)
-        ax_xz_far.set_title('XZ Plane (y=0) - Far-Field Monitors', pad=1, fontsize=14, fontweight='bold')
-        ax_xz_far.set_aspect('auto')  # Use auto instead of equal
-        
-        # RIGHT column: single axis spanning full height
-        ax_yz_far = fig_far.add_subplot(outer[1])
-        simulation.plot(x=0, ax=ax_yz_far)
-        ax_yz_far.set_title('YZ Plane (x=0) - Cross Section', pad=2, fontsize=14, fontweight='bold')
-        ax_yz_far.set_aspect('auto')  # Use auto instead of equal
-        
-        # No tight_layout; just small outer margins
-        fig_far.subplots_adjust(left=0.06, right=0.98, top=0.96, bottom=0.06)
-        plt.savefig('simulation_setup_farfield.png', dpi=150, bbox_inches='tight')
-        plt.show()
-        print("✓ Farfield visualization saved to simulation_setup_farfield.png")
+        print("✓ Visualization saved to simulation_setup.png")
 
 
 def create_simulation_setup(thickness_um: float = 0.14, 
