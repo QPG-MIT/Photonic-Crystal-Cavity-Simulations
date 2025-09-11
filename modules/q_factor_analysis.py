@@ -533,21 +533,22 @@ class QFactorAnalyzer:
     def _plot_ringdown_analysis(self, t_all: np.ndarray, y_all: np.ndarray,
                                t: np.ndarray, z: np.ndarray, ref: Dict, i0: int) -> None:
         """Create ringdown analysis plots."""
+        apply_theme()
         plt.figure(figsize=(12, 4.8))
         
         # Plot full signal
-        plt.semilogy(t_all*1e12, np.abs(hilbert(y_all)), 'b-', alpha=0.7, 
+        plt.semilogy(t_all*1e12, np.abs(hilbert(y_all)), alpha=0.7, 
                     linewidth=0.8, label='Full signal')
         
         # Plot tail segment
-        plt.semilogy(t*1e12, np.abs(z), 'g-', linewidth=1.3, label='Analysis tail')
+        plt.semilogy(t*1e12, np.abs(z), linewidth=1.3, label='Analysis tail')
         
         # Plot model
-        plt.semilogy(t*1e12, np.abs(ref['model']), 'r--', linewidth=1.8, 
+        plt.semilogy(t*1e12, np.abs(ref['model']), '--', linewidth=1.8, 
                     label=f'Model (K={len(ref["f"])})')
         
         # Mark tail start
-        plt.axvline(t_all[i0]*1e12, color='k', linestyle=':', linewidth=0.9, 
+        plt.axvline(t_all[i0]*1e12, linestyle=':', linewidth=0.9, 
                    label='Tail start')
         
         plt.xlabel("Time (ps)")

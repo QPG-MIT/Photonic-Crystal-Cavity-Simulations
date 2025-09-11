@@ -17,6 +17,7 @@ import warnings
 from scipy.optimize import curve_fit
 from scipy.integrate import trapezoid
 from typing import Dict, Tuple, Optional
+from .plot_style import apply_theme
 
 # Suppress warnings for cleaner output
 warnings.filterwarnings('ignore')
@@ -301,6 +302,8 @@ class NearFieldAnalyzer:
         Create comprehensive near-field visualization plots
         """
         print("\n📊 Creating near-field analysis plots...")
+        apply_theme()
+
         
         # Create figure with subplots
         fig = plt.figure(figsize=(16, 12))
@@ -308,7 +311,7 @@ class NearFieldAnalyzer:
         # Plot 1: Field intensity
         ax1 = plt.subplot(2, 3, 1)
         im1 = ax1.imshow(I, extent=[x.min(), x.max(), y.min(), y.max()], 
-                        origin='lower', cmap='hot', aspect='auto')
+                        origin='lower', cmap='magma', aspect='auto')
         ax1.set_title('Field Intensity')
         ax1.set_xlabel('x (µm)')
         ax1.set_ylabel('y (µm)')
@@ -345,8 +348,8 @@ class NearFieldAnalyzer:
         ax5 = plt.subplot(2, 3, 5)
         I_x_profile = np.sum(I, axis=1)
         I_y_profile = np.sum(I, axis=0)
-        ax5.plot(x, I_x_profile, 'b-', label='X profile', linewidth=2)
-        ax5.plot(y, I_y_profile, 'r-', label='Y profile', linewidth=2)
+        ax5.plot(x, I_x_profile, label='X profile', linewidth=2)
+        ax5.plot(y, I_y_profile, label='Y profile', linewidth=2)
         ax5.set_xlabel('Position (µm)')
         ax5.set_ylabel('Intensity (arb. units)')
         ax5.set_title('Field Profiles')
@@ -366,10 +369,8 @@ class NearFieldAnalyzer:
         Ez_fraction = np.sum(Ez_mag) / np.sum(total_mag)
         
         fractions = [Ex_fraction, Ey_fraction, Ez_fraction]
-        labels = ['Ex', 'Ey', 'Ez']
-        colors = ['red', 'green', 'blue']
-        
-        bars = ax6.bar(labels, fractions, color=colors, alpha=0.7)
+        labels = ['Ex', 'Ey', 'Ez']        
+        bars = ax6.bar(labels, fractions, alpha=0.7)
         ax6.set_ylabel('Polarization Fraction')
         ax6.set_title('Field Polarization')
         ax6.set_ylim(0, 1)

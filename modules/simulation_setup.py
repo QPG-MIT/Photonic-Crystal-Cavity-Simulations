@@ -425,6 +425,7 @@ class SimulationSetup:
         print("\n📊 Visualizing simulation setup...")
         
         # Create comprehensive 2D visualizations
+        apply_theme()
         fig, axes = plt.subplots(2, 3, figsize=(18, 12))
         
         # XY plane (z=0) - top view

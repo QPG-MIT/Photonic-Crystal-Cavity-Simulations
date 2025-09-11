@@ -19,6 +19,7 @@ import tidy3d as td
 from numpy import pi, trapezoid
 from pathlib import Path
 from dataclasses import dataclass
+from .plot_style import apply_theme
 from typing import Dict, List, Tuple, Optional, Any
 import warnings
 
@@ -331,6 +332,7 @@ class PolarizationAnalyzer:
     def plot_theta_phi_heatmaps(self, res: FarfieldSummary, save_prefix: str = "polarization") -> None:
         """Plot theta-phi heatmaps of polarization properties."""
         print(f"\n📊 Creating theta-phi heatmaps...")
+        apply_theme()
         
         theta_deg = np.rad2deg(res.theta)
         phi_deg = np.rad2deg(res.phi)
@@ -375,6 +377,7 @@ class PolarizationAnalyzer:
     def plot_azimuthal_averages(self, res: FarfieldSummary, save_prefix: str = "polarization") -> None:
         """Plot azimuthal averages of polarization properties."""
         print(f"\n📊 Creating azimuthal averages...")
+        apply_theme()
         
         S0 = res.per_angle["S0"]
         S1 = res.per_angle["S1"]
@@ -411,6 +414,7 @@ class PolarizationAnalyzer:
                           scatter: bool = True) -> None:
         """Plot back focal plane intensity with NA circle."""
         print(f"\n📊 Creating back focal plane plot...")
+        apply_theme()
         
         theta2d, phi2d = res.theta, res.phi
         S0 = res.per_angle["S0"]
@@ -450,6 +454,7 @@ class PolarizationAnalyzer:
                                    step: int = 4, scale: float = 0.05) -> None:
         """Plot polarization orientation and ellipticity in BFP."""
         print(f"\n📊 Creating polarization quiver plot...")
+        apply_theme()
         
         theta2d, phi2d = res.theta, res.phi
         ux = np.sin(theta2d) * np.cos(phi2d)

@@ -347,6 +347,8 @@ class ModeVolumeAnalyzer:
             save_file: Output filename for plot
         """
         print(f"\n📊 Creating field distribution plots...")
+        apply_theme()
+
         
         # Compute field intensity
         E_squared = np.abs(Ex)**2 + np.abs(Ey)**2 + np.abs(Ez)**2
@@ -361,7 +363,7 @@ class ModeVolumeAnalyzer:
         # XY plane (z=0)
         im1 = axes[0, 0].imshow(E_squared[k_center, :, :], 
                                extent=[x.min()*1e6, x.max()*1e6, y.min()*1e6, y.max()*1e6],
-                               origin='lower', cmap='hot', aspect='auto')
+                               origin='lower', cmap='magma', aspect='auto')
         axes[0, 0].set_title('Field Intensity (XY plane)')
         axes[0, 0].set_xlabel('x (µm)')
         axes[0, 0].set_ylabel('y (µm)')
@@ -370,7 +372,7 @@ class ModeVolumeAnalyzer:
         # XZ plane (y=0)
         im2 = axes[0, 1].imshow(E_squared[:, j_center, :], 
                                extent=[x.min()*1e6, x.max()*1e6, z.min()*1e6, z.max()*1e6],
-                               origin='lower', cmap='hot', aspect='auto')
+                               origin='lower', cmap='magma', aspect='auto')
         axes[0, 1].set_title('Field Intensity (XZ plane)')
         axes[0, 1].set_xlabel('x (µm)')
         axes[0, 1].set_ylabel('z (µm)')
@@ -379,7 +381,7 @@ class ModeVolumeAnalyzer:
         # YZ plane (x=0)
         im3 = axes[0, 2].imshow(E_squared[:, :, i_center], 
                                extent=[y.min()*1e6, y.max()*1e6, z.min()*1e6, z.max()*1e6],
-                               origin='lower', cmap='hot', aspect='auto')
+                               origin='lower', cmap='magma', aspect='auto')
         axes[0, 2].set_title('Field Intensity (YZ plane)')
         axes[0, 2].set_xlabel('y (µm)')
         axes[0, 2].set_ylabel('z (µm)')
