@@ -18,7 +18,10 @@ from scipy.signal import hilbert
 from scipy.interpolate import griddata
 from scipy.ndimage import gaussian_filter
 from typing import Dict, Tuple, Optional
-from .plot_style import apply_theme
+try:
+    from .plot_style import apply_theme, PALETTE, mono_cmap, bipolar_cmap
+except ImportError:
+    from plot_style import apply_theme, PALETTE, mono_cmap, bipolar_cmap
 
 # Suppress warnings for cleaner output
 warnings.filterwarnings('ignore')
@@ -491,10 +494,11 @@ class FarFieldAnalyzer:
                 I_oriented = self._orient_for_imshow(I, kx, ky)
                 
                 im = ax.imshow(I_oriented, extent=[kx.min(), kx.max(), ky.min(), ky.max()], 
-                              origin='lower', cmap='magma', aspect='auto')
+                              origin='lower', cmap=mono_cmap, aspect='auto')
                 ax.set_xlabel('kx (1/µm)')
                 ax.set_ylabel('ky (1/µm)')
-                ax.set_title(f'{monitor_name}\nK-space')
+                ax.set_title('K-Space Far-Field Distribution')
+                ax.grid(False)
                 
             elif 'angles' in monitor_name and 'theta' in coords and 'phi' in coords:
                 # Angular plot
@@ -516,12 +520,13 @@ class FarFieldAnalyzer:
                         theta_min, theta_max = theta_2d.min(), theta_2d.max()
                         phi_min, phi_max = phi_2d.min(), phi_2d.max()
                         im = ax.imshow(I, extent=[phi_min, phi_max, theta_min, theta_max], 
-                                      origin='lower', cmap='magma', aspect='auto')
+                                      origin='lower', cmap=mono_cmap, aspect='auto')
                     else:
                         im = ax.imshow(I, extent=[phi_2d.min(), phi_2d.max(), theta_2d.min(), theta_2d.max()], 
-                                      origin='lower', cmap='magma', aspect='auto')
+                                      origin='lower', cmap=mono_cmap, aspect='auto')
                     ax.set_xlabel('φ (deg)')
                     ax.set_ylabel('θ (deg)')
+                    ax.grid(False)
                 elif len(I.shape) == 3:
                     # 3D pattern - remove frequency dimension for plotting
                     I_2d = I[0, :, :]  # Remove frequency dimension
@@ -536,9 +541,10 @@ class FarFieldAnalyzer:
                     theta_min, theta_max = theta_2d.min(), theta_2d.max()
                     phi_min, phi_max = phi_2d.min(), phi_2d.max()
                     im = ax.imshow(I_2d, extent=[phi_min, phi_max, theta_min, theta_max], 
-                                  origin='lower', cmap='magma', aspect='auto')
+                                  origin='lower', cmap=mono_cmap, aspect='auto')
                     ax.set_xlabel('φ (deg)')
                     ax.set_ylabel('θ (deg)')
+                    ax.grid(False)
                 else:
                     # 1D pattern
                     if theta.ndim > 1:
@@ -547,15 +553,17 @@ class FarFieldAnalyzer:
                         theta_1d = theta
                     # Ensure I is 1D for plotting
                     I_1d = I.flatten() if I.ndim > 1 else I
-                    ax.plot(theta_1d, I_1d, linewidth=2)
+                    ax.plot(theta_1d, I_1d, linewidth=2, color=PALETTE[0])
                     ax.set_xlabel('θ (deg)')
                     ax.set_ylabel('Intensity')
-                ax.set_title(f'{monitor_name}\nRadiation Pattern')
+                    ax.grid(False)
+                ax.set_title('Angular Radiation Pattern')
                 
             else:
                 # Generic plot
-                im = ax.imshow(I, cmap='magma', aspect='auto')
-                ax.set_title(f'{monitor_name}\nIntensity')
+                im = ax.imshow(I, cmap=mono_cmap, aspect='auto')
+                ax.set_title('Far-Field Intensity Distribution')
+                ax.grid(False)
             
             # Add colorbar for image plots
             if 'im' in locals():
@@ -622,15 +630,15 @@ class FarFieldAnalyzer:
         apply_theme()
         fig, ax = plt.subplots()
         eff_percent = np.array(collection_efficiencies) * 100
-        ax.plot(na_values, eff_percent, marker='o')
+        ax.plot(na_values, eff_percent, marker='o', linewidth=2.5, markersize=6, color=PALETTE[0])
         current_na = self.NA
         current_eff = np.interp(current_na, na_values, collection_efficiencies) * 100
-        ax.axvline(current_na, linestyle='--')
-        ax.axhline(current_eff, linestyle='--')
+        ax.axvline(current_na, linestyle='--', color=PALETTE[1], alpha=1, linewidth=1, zorder=-1)
+        ax.axhline(current_eff, linestyle='--', color=PALETTE[2], alpha=1, linewidth=1, zorder=-1)
         ax.set_xlabel('Numerical Aperture (NA)')
         ax.set_ylabel('Collection Efficiency (%)')
         ax.set_title('Collection Efficiency vs Numerical Aperture')
-        ax.grid(True, alpha=0.3)
+        ax.grid(False)
         plt.tight_layout()
         plt.savefig('collection_efficiency_vs_na.png', dpi=300, bbox_inches='tight')
         plt.show()

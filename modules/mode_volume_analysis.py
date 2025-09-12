@@ -22,7 +22,7 @@ from matplotlib.path import Path as MPLPath
 from typing import Dict, Tuple, Optional, Any
 import warnings
 
-from .plot_style import apply_theme, PALETTE
+from .plot_style import apply_theme, PALETTE, mono_cmap, bipolar_cmap
 
 # Suppress warnings for cleaner output
 warnings.filterwarnings('ignore')
@@ -370,7 +370,7 @@ class ModeVolumeAnalyzer:
         # XY plane (z=0) - Top view
         im1 = axes[0].imshow(E_squared[k_center, :, :], 
                             extent=[x.min()*1e6, x.max()*1e6, y.min()*1e6, y.max()*1e6],
-                            origin='lower', cmap='plasma', aspect='auto', alpha=0.8,
+                            origin='lower', cmap=mono_cmap, aspect='auto', alpha=0.8,
                             vmin=vmin_linear, vmax=vmax_linear)
         axes[0].set_title('Top View (XY plane)', fontsize=14, fontweight='bold')
         axes[0].set_xlabel('x (µm)')
@@ -384,7 +384,7 @@ class ModeVolumeAnalyzer:
         # XZ plane (y=0) - Side view
         im2 = axes[1].imshow(E_squared[:, j_center, :], 
                             extent=[x.min()*1e6, x.max()*1e6, z.min()*1e6, z.max()*1e6],
-                            origin='lower', cmap='plasma', aspect='auto', alpha=0.8,
+                            origin='lower', cmap=mono_cmap, aspect='auto', alpha=0.8,
                             vmin=vmin_linear, vmax=vmax_linear)
         axes[1].set_title('Side View (XZ plane)', fontsize=14, fontweight='bold')
         axes[1].set_xlabel('x (µm)')
@@ -398,7 +398,7 @@ class ModeVolumeAnalyzer:
         # YZ plane (x=0) - Front view
         im3 = axes[2].imshow(E_squared[:, :, i_center], 
                             extent=[y.min()*1e6, y.max()*1e6, z.min()*1e6, z.max()*1e6],
-                            origin='lower', cmap='plasma', aspect='auto', alpha=0.8,
+                            origin='lower', cmap=mono_cmap, aspect='auto', alpha=0.8,
                             vmin=vmin_linear, vmax=vmax_linear)
         axes[2].set_title('Front View (YZ plane)', fontsize=14, fontweight='bold')
         axes[2].set_xlabel('y (µm)')

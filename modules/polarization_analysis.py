@@ -19,7 +19,7 @@ import tidy3d as td
 from numpy import pi, trapezoid
 from pathlib import Path
 from dataclasses import dataclass
-from .plot_style import apply_theme, PALETTE
+from .plot_style import apply_theme, PALETTE, mono_cmap, bipolar_cmap
 from typing import Dict, List, Tuple, Optional, Any
 import warnings
 
@@ -342,9 +342,8 @@ class PolarizationAnalyzer:
         
         fig, axs = plt.subplots(1, 3, figsize=(16, 4.5), sharex=True, sharey=True)
         
-        # Create consistent colormap from palette
-        from matplotlib.colors import LinearSegmentedColormap
-        consistent_cmap = LinearSegmentedColormap.from_list('consistent', [PALETTE[0], PALETTE[1], PALETTE[2]])
+        # Use the consistent colormap from plot_style
+        consistent_cmap = mono_cmap
         
         # S0 (power)
         im1 = axs[0].pcolormesh(phi_deg, theta_deg, S0/np.max(S0), 
@@ -427,9 +426,8 @@ class PolarizationAnalyzer:
         uy = np.sin(theta2d) * np.sin(phi2d)
         I = S0 / (np.max(S0) + 1e-30)
         
-        # Create consistent colormap from palette
-        from matplotlib.colors import LinearSegmentedColormap
-        bfp_cmap = LinearSegmentedColormap.from_list('bfp', [PALETTE[0], PALETTE[1], PALETTE[2]])
+        # Use the consistent colormap from plot_style
+        bfp_cmap = mono_cmap
         
         plt.figure(figsize=(5.5, 5.2))
         if scatter:
@@ -477,9 +475,8 @@ class PolarizationAnalyzer:
         dx = scale * np.cos(psi_s)
         dy = scale * np.sin(psi_s)
         
-        # Create consistent colormap from palette for quiver plot
-        from matplotlib.colors import LinearSegmentedColormap
-        quiver_cmap = LinearSegmentedColormap.from_list('quiver', [PALETTE[3], PALETTE[4], PALETTE[5]])
+        # Use the consistent colormap from plot_style for quiver plot
+        quiver_cmap = bipolar_cmap
         
         plt.figure(figsize=(6, 6))
         plt.quiver(ux_s, uy_s, dx, dy, np.tanh(2*chi_s), angles="xy",

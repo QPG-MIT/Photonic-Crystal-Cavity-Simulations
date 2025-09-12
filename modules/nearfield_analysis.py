@@ -18,9 +18,9 @@ from scipy.optimize import curve_fit
 from typing import Dict, Optional
 
 try:
-    from .plot_style import apply_theme
+    from .plot_style import apply_theme, PALETTE, mono_cmap, bipolar_cmap
 except ImportError:
-    from plot_style import apply_theme
+    from plot_style import apply_theme, PALETTE, mono_cmap, bipolar_cmap
 
 # Suppress warnings for cleaner output
 warnings.filterwarnings('ignore')
@@ -312,7 +312,7 @@ class NearFieldAnalyzer:
             I,
             extent=[x.min(), x.max(), y.min(), y.max()],
             origin="lower",
-            cmap="plasma",
+            cmap=mono_cmap,
             aspect="equal",
             alpha=0.85,
             vmin=vmin_linear,
@@ -332,7 +332,7 @@ class NearFieldAnalyzer:
             np.real(Ex2),
             extent=[x.min(), x.max(), y.min(), y.max()],
             origin="lower",
-            cmap="RdBu",
+            cmap=bipolar_cmap,
             aspect="equal",
         )
         axes[1].set_title("Ex (real)", fontsize=14, fontweight="bold")
@@ -349,7 +349,7 @@ class NearFieldAnalyzer:
             np.real(Ey2),
             extent=[x.min(), x.max(), y.min(), y.max()],
             origin="lower",
-            cmap="RdBu",
+            cmap=bipolar_cmap,
             aspect="equal",
         )
         axes[2].set_title("Ey (real)", fontsize=14, fontweight="bold")
@@ -376,7 +376,7 @@ class NearFieldAnalyzer:
             I,
             extent=[x.min(), x.max(), y.min(), y.max()],
             origin="lower",
-            cmap="plasma",
+            cmap=mono_cmap,
             aspect="equal",
             alpha=0.85,
         )
