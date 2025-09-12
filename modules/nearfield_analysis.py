@@ -304,8 +304,8 @@ class NearFieldAnalyzer:
         fig, axes = plt.subplots(3, 1, figsize=(12, 8))
 
         # Calculate colormap limits for better visibility (crop to show 1-99th percentile)
-        vmin_linear = np.percentile(I, 0.01)
-        vmax_linear = np.percentile(I, 99.99)
+        vmin_linear = np.percentile(I, 0.1)
+        vmax_linear = np.percentile(I, 99.9)
 
         # 1) Field Intensity
         im1 = axes[0].imshow(
@@ -314,7 +314,7 @@ class NearFieldAnalyzer:
             origin="lower",
             cmap=mono_cmap,
             aspect="equal",
-            alpha=0.85,
+            alpha=1,
             vmin=vmin_linear,
             vmax=vmax_linear,
         )
@@ -378,7 +378,7 @@ class NearFieldAnalyzer:
             origin="lower",
             cmap=mono_cmap,
             aspect="equal",
-            alpha=0.85,
+            alpha=1,
         )
         self._add_structure_outline_nearfield(ax, x, y)
         #self._plot_gds_outline_raw(ax)
@@ -398,7 +398,7 @@ class NearFieldAnalyzer:
             transform=ax.transAxes,
             fontsize=10,
             va="top",
-            bbox=dict(boxstyle="round", facecolor="white", alpha=0.8),
+            bbox=dict(boxstyle="round", facecolor="white", alpha=1),
         )
 
         plt.tight_layout()
@@ -482,7 +482,7 @@ class NearFieldAnalyzer:
                 cc = np.clip(c[:, 1].astype(int), 0, len(x) - 1)  # cols
                 yy = y[rr]
                 xx = x[cc]
-                ax.plot(xx, yy, color=color, linewidth=1.2, alpha=0.9)
+                ax.plot(xx, yy, color=color, linewidth=1.2, alpha=1)
         except Exception as e:
             print(f"Warning: Could not add structure outline: {e}")
 
@@ -502,7 +502,7 @@ class NearFieldAnalyzer:
         try:
             import gdstk
 
-            def _plot_cell(cell, scale, color="w", lw=1.2, alpha=0.9, layer_filter=None):
+            def _plot_cell(cell, scale, color="w", lw=0.1, alpha=1, layer_filter=None):
                 xs, ys = [], []
                 for poly in getattr(cell, "polygons", []):
                     if layer_filter is not None and (poly.layer, poly.datatype) != layer_filter:
@@ -520,7 +520,7 @@ class NearFieldAnalyzer:
             cav = gdstk.read_gds(str(cavity_gds))
             top = cav.top_level()[0]
             s = cav.unit / 1e-6
-            xs, ys = _plot_cell(top, s, color="w", lw=1.5, alpha=0.95)
+            xs, ys = _plot_cell(top, s, color="w", lw=0.1, alpha=1)
             xs_all += xs
             ys_all += ys
 
@@ -533,8 +533,8 @@ class NearFieldAnalyzer:
                     top_h,
                     sh,
                     color="w",
-                    lw=0.9,
-                    alpha=0.8,
+                    lw=0.1,
+                    alpha=1,
                     layer_filter=(hole_layer, hole_dtype),
                 )
                 xs_all += xs

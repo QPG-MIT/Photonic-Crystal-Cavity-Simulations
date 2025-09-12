@@ -458,7 +458,7 @@ class PolarizationAnalyzer:
         print(f"✓ Back focal plane plot saved to {save_prefix}_bfp.png")
     
     def plot_bfp_polarization_quiver(self, res: FarfieldSummary, save_prefix: str = "polarization",
-                                   step: int = 4, scale: float = 0.05) -> None:
+                                   step: int = 4, scale: float = 0.075) -> None:
         """Plot polarization orientation and ellipticity in BFP."""
         print(f"\n📊 Creating polarization quiver plot...")
         apply_theme()
@@ -480,7 +480,7 @@ class PolarizationAnalyzer:
         
         plt.figure(figsize=(6, 6))
         plt.quiver(ux_s, uy_s, dx, dy, np.tanh(2*chi_s), angles="xy",
-                  scale_units="xy", scale=1.0, cmap=quiver_cmap, width=0.004)
+                  scale_units="xy", scale=1, cmap=quiver_cmap, width=0.004)
         plt.colorbar(label="tanh(2χ) ~ ellipticity")
         circle = plt.Circle((0, 0), res.NA/res.n_bg, color="k", fill=False, lw=1.0)
         plt.gca().add_artist(circle)

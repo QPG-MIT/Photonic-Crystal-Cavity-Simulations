@@ -370,7 +370,7 @@ class ModeVolumeAnalyzer:
         # XY plane (z=0) - Top view
         im1 = axes[0].imshow(E_squared[k_center, :, :], 
                             extent=[x.min()*1e6, x.max()*1e6, y.min()*1e6, y.max()*1e6],
-                            origin='lower', cmap=mono_cmap, aspect='auto', alpha=0.8,
+                            origin='lower', cmap=mono_cmap, aspect='auto', alpha=1,
                             vmin=vmin_linear, vmax=vmax_linear)
         axes[0].set_title('Top View (XY plane)', fontsize=14, fontweight='bold')
         axes[0].set_xlabel('x (µm)')
@@ -384,7 +384,7 @@ class ModeVolumeAnalyzer:
         # XZ plane (y=0) - Side view
         im2 = axes[1].imshow(E_squared[:, j_center, :], 
                             extent=[x.min()*1e6, x.max()*1e6, z.min()*1e6, z.max()*1e6],
-                            origin='lower', cmap=mono_cmap, aspect='auto', alpha=0.8,
+                            origin='lower', cmap=mono_cmap, aspect='auto', alpha=1,
                             vmin=vmin_linear, vmax=vmax_linear)
         axes[1].set_title('Side View (XZ plane)', fontsize=14, fontweight='bold')
         axes[1].set_xlabel('x (µm)')
@@ -398,7 +398,7 @@ class ModeVolumeAnalyzer:
         # YZ plane (x=0) - Front view
         im3 = axes[2].imshow(E_squared[:, :, i_center], 
                             extent=[y.min()*1e6, y.max()*1e6, z.min()*1e6, z.max()*1e6],
-                            origin='lower', cmap=mono_cmap, aspect='auto', alpha=0.8,
+                            origin='lower', cmap=mono_cmap, aspect='auto', alpha=1,
                             vmin=vmin_linear, vmax=vmax_linear)
         axes[2].set_title('Front View (YZ plane)', fontsize=14, fontweight='bold')
         axes[2].set_xlabel('y (µm)')
@@ -436,9 +436,9 @@ class ModeVolumeAnalyzer:
                     avg_eps = np.mean(eps_slice[contour[:, 0].astype(int), contour[:, 1].astype(int)])
                     
                     if avg_eps > eps_threshold * 1.2:  # Cavity
-                        ax.plot(x_coords*1e6, y_coords*1e6, 'w-', linewidth=2, alpha=0.8)
+                        ax.plot(x_coords*1e6, y_coords*1e6, 'w-', linewidth=2, alpha=1)
                     else:  # Hole
-                        ax.plot(x_coords*1e6, y_coords*1e6, 'w-', linewidth=1, alpha=0.6)
+                        ax.plot(x_coords*1e6, y_coords*1e6, 'w-', linewidth=1, alpha=1)
         except Exception as e:
             print(f"Warning: Could not add structure outline to XY plane: {e}")
     
@@ -458,7 +458,7 @@ class ModeVolumeAnalyzer:
                     x_coords = x[contour[:, 1].astype(int)]
                     
                     # For XZ plane, we plot the top and bottom boundaries
-                    ax.plot(x_coords*1e6, z_coords*1e6, 'w-', linewidth=2, alpha=0.8)
+                    ax.plot(x_coords*1e6, z_coords*1e6, 'w-', linewidth=2, alpha=1)
         except Exception as e:
             print(f"Warning: Could not add structure outline to XZ plane: {e}")
     
@@ -478,7 +478,7 @@ class ModeVolumeAnalyzer:
                     y_coords = y[contour[:, 1].astype(int)]
                     
                     # For YZ plane, we plot the top and bottom boundaries
-                    ax.plot(y_coords*1e6, z_coords*1e6, 'w-', linewidth=2, alpha=0.8)
+                    ax.plot(y_coords*1e6, z_coords*1e6, 'w-', linewidth=2, alpha=1)
         except Exception as e:
             print(f"Warning: Could not add structure outline to YZ plane: {e}")
     

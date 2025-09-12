@@ -3,34 +3,28 @@ from matplotlib import pyplot as plt
 from cycler import cycler
 from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 
-# ---- Color definitions from prova_colori.py ----
-dark_green = "#283618"
-light_green = "#606C38"
-cream = "#FEFAE0"
-light_brown = "#DDA15E"
-dark_brown = "#BC6C25"
+
+blue  = "#002642"
+red = "#840032"
+yellow = "#e59500"
+white = "#FFFAF2"
+black  = "#02040f"
 
 # Discrete color palette used across all plots
-PALETTE = [
-    dark_green, 
-    light_brown, 
-    light_green,
-    dark_brown, 
-    cream
-]
+PALETTE = [red, blue, yellow, black]
 
-# For line plots
-line_cmap = ListedColormap(PALETTE)
+# For line plots (discrete)
+line_cmap = ListedColormap(PALETTE, name="line_palette")
 
-# ---- Build a monopolar colormap (low → high) ----
-# Interpolates smoothly across the palette
+# ---- Monopolar colormap (low → high) ----
 mono_cmap = LinearSegmentedColormap.from_list(
-    "mono", [dark_green, cream], N=256
+    "mono", [black, blue, red, yellow, white], N=256
 )
 
-# ---- Build a bipolar colormap (negative ↔ positive) ----
-# Centered at zero, so you may want symmetric coloring
-bipolar_cmap = LinearSegmentedColormap.from_list("bipolar", [dark_brown, cream, dark_green], N=256)
+# ---- Bipolar colormap (negative ↔ positive) ----
+bipolar_cmap = LinearSegmentedColormap.from_list(
+    "bipolar", [black, blue, white, yellow, red], N=256
+)
 
 def apply_theme() -> None:
     """Apply a simple, elegant plotting style using the global palette."""

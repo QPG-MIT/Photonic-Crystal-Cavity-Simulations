@@ -422,7 +422,7 @@ class QFactorAnalyzer:
             Dictionary with analysis results
         """
         print("="*70)
-        print("🔬 Q-FACTOR RINGDOWN ANALYSIS")
+        print("🔬 Q-FACTOR RINGDOWN ANALYSIS (FFT-based)")
         print("="*70)
         
         # Extract time and signal data
@@ -450,20 +450,48 @@ class QFactorAnalyzer:
         print(f"  - Tail duration: {Tseg*1e12:.3f} ps")
         print(f"  - Tail points: {len(t)}")
         
+        # IMPROVED: Use FFT-based frequency estimation as primary method
+        f_fft = self.fft_peak_hz(z, t)
+        f_wavelength = C0 / (self.wavelength_um * 1e-6)
+        
+        print(f"✓ Frequency estimation comparison:")
+        print(f"  - FFT estimate: {f_fft/1e12:.6f} THz")
+        print(f"  - Wavelength guess: {f_wavelength/1e12:.6f} THz")
+        print(f"  - Difference: {abs(f_fft - f_wavelength)/1e12:.6f} THz")
+        
+        # Use FFT estimate as primary, with wavelength as fallback
+        if f_fft > 0 and abs(f_fft - f_wavelength) / f_wavelength < 0.1:  # Within 10%
+            f_primary = f_fft
+            method = "FFT-based"
+        else:
+            f_primary = f_wavelength
+            method = "wavelength-based (FFT failed)"
+            print(f"  ⚠️  FFT estimate seems unreliable, using wavelength-based guess")
+        
+        print(f"  - Using: {f_primary/1e12:.6f} THz ({method})")
+        
         # Extract initial seeds
         f_med, f_mad, a_seed = self.seeds_from_tail(t, z)
-        f_guess = C0 / (self.wavelength_um * 1e-6)  # Use wavelength-based guess
         
         print(f"✓ Extracted initial seeds")
         print(f"  - Frequency seed: {f_med/1e12:.6f} THz")
         print(f"  - Decay rate seed: {a_seed:.3e} 1/s")
-        print(f"  - Wavelength guess: {f_guess/1e12:.6f} THz")
+        print(f"  - Primary frequency: {f_primary/1e12:.6f} THz")
         
-        # Build grids
-        f_grid, a_grid = self.build_grids(f_guess, a_seed)
-        print(f"✓ Built search grids")
+        # IMPROVED: Use larger grid span for better interpolation
+        # Temporarily modify the grid configuration for better coverage
+        original_df_rel_span = self.ringdown_config['df_rel_span']
+        self.ringdown_config['df_rel_span'] = 0.05  # Increase from 1% to 5%
+        
+        # Build grids using primary frequency estimate
+        f_grid, a_grid = self.build_grids(f_primary, a_seed)
+        print(f"✓ Built search grids (improved span)")
         print(f"  - Frequency grid: {len(f_grid)} points")
         print(f"  - Decay rate grid: {len(a_grid)} points")
+        print(f"  - Grid span: ±{self.ringdown_config['df_rel_span']*100:.1f}%")
+        
+        # Restore original configuration
+        self.ringdown_config['df_rel_span'] = original_df_rel_span
         
         # Grid fit
         best1 = self.fit_one_mode_grid(t, z, f_grid, a_grid, 
@@ -526,7 +554,11 @@ class QFactorAnalyzer:
                 'wavelength_um': self.wavelength_um,
                 'quality_preset': self.quality_preset,
                 'tail_start_index': i0,
-                'tail_duration_ps': Tseg * 1e12
+                'tail_duration_ps': Tseg * 1e12,
+                'frequency_estimation_method': method,
+                'fft_frequency_thz': f_fft/1e12,
+                'wavelength_frequency_thz': f_wavelength/1e12,
+                'primary_frequency_thz': f_primary/1e12
             }
         }
         
