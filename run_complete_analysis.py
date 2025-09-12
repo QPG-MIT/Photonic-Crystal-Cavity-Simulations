@@ -26,6 +26,10 @@ from modules.nearfield_analysis import analyze_nearfield
 from modules.farfield_analysis import analyze_farfield
 from modules.collection_efficiency_analysis import analyze_collection_efficiency
 
+# Physical constants
+C0 = 299792458.0  # Speed of light in vacuum (m/s)
+thickness_um = 0.18
+
 def run_complete_analysis():
     """
     Run the complete photonic cavity analysis workflow
@@ -36,9 +40,9 @@ def run_complete_analysis():
     
     # Configuration (matching the notebook)
     CONFIG = {
-        'results_file': 'results_0.14um.hdf5',
-        'wavelength_um': 0.62,
-        'thickness_um': 0.14,
+        'results_file': f'results_{thickness_um}um.hdf5',
+        'wavelength_um': 0.650,
+        'thickness_um': thickness_um,
         'NA': 0.9,
         'n_bg': 1.0,
         'n_emitter': 2.414
@@ -73,6 +77,18 @@ def run_complete_analysis():
             decay_times_ps = np.array(q_results['decay_times_s']) * 1e12  # Convert to ps
             print(f"  Decay times: {decay_times_ps} ps")
         
+        # Calculate resonance wavelength from Q-factor analysis
+        resonance_frequency_hz = q_results['frequencies_hz'][0]  # Use first mode
+        resonance_wavelength_um = C0 / resonance_frequency_hz * 1e6  # Convert to micrometers
+        print(f"  Resonance frequency: {resonance_frequency_hz/1e12:.6f} THz")
+        print(f"  Resonance wavelength: {resonance_wavelength_um:.6f} µm")
+        print(f"  Original wavelength: {CONFIG['wavelength_um']:.6f} µm")
+        print(f"  Wavelength difference: {abs(resonance_wavelength_um - CONFIG['wavelength_um']):.6f} µm")
+        
+        # Update CONFIG to use resonance wavelength for subsequent analyses
+        CONFIG['resonance_wavelength_um'] = resonance_wavelength_um
+        print(f"  ✓ Updated CONFIG to use resonance wavelength: {resonance_wavelength_um:.6f} µm")
+        
     except Exception as e:
         print(f"❌ Q-factor analysis failed: {e}")
         import traceback
@@ -91,7 +107,7 @@ def run_complete_analysis():
         mv_results = analyze_mode_volume(
             data_path=CONFIG['results_file'],
             thickness_um=CONFIG['thickness_um'],
-            wavelength_um=CONFIG['wavelength_um'],
+            wavelength_um=CONFIG['resonance_wavelength_um'],  # Use resonance wavelength
             Q=Q,
             n_emitter=CONFIG['n_emitter'],
             save_results=True,
@@ -118,7 +134,7 @@ def run_complete_analysis():
     try:
         pol_results = analyze_polarization(
             data_path=CONFIG['results_file'],
-            wavelength_um=CONFIG['wavelength_um'],
+            wavelength_um=CONFIG['resonance_wavelength_um'],  # Use resonance wavelength
             save_results=True,
             create_plots=True
         )
@@ -146,7 +162,7 @@ def run_complete_analysis():
         nf_results = analyze_nearfield(
             data_path=CONFIG['results_file'],
             monitor_name="field_near",
-            wavelength_um=CONFIG['wavelength_um'],
+            wavelength_um=CONFIG['resonance_wavelength_um'],  # Use resonance wavelength
             save_results=True,
             create_plots=True
         )
@@ -173,7 +189,7 @@ def run_complete_analysis():
         ff_results = analyze_farfield(
             data_path=CONFIG['results_file'],
             monitor_names=['farfield_kspace', 'farfield_angles'],  # Exclude cartesian
-            wavelength_um=CONFIG['wavelength_um'],
+            wavelength_um=CONFIG['resonance_wavelength_um'],  # Use resonance wavelength
             NA=CONFIG['NA'],
             n_bg=CONFIG['n_bg'],
             save_results=True,
@@ -216,7 +232,7 @@ def run_complete_analysis():
         ce_results = analyze_collection_efficiency(
             data_path=CONFIG['results_file'],
             monitor_names=['farfield_kspace', 'farfield_angles'],  # Exclude cartesian
-            wavelength_um=CONFIG['wavelength_um'],
+            wavelength_um=CONFIG['resonance_wavelength_um'],  # Use resonance wavelength
             NA=CONFIG['NA'],
             n_bg=CONFIG['n_bg'],
             save_results=True,

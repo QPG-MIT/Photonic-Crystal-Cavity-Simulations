@@ -89,10 +89,10 @@ class ModeVolumeAnalyzer:
         Ey = field_data.Ey.values
         Ez = field_data.Ez.values
         
-        # Get coordinates (in meters)
-        x = field_data.Ex.coords['x'].values * 1e-6  # Convert from microns to meters
-        y = field_data.Ex.coords['y'].values * 1e-6  # Convert from microns to meters
-        z = field_data.Ex.coords['z'].values * 1e-6  # Convert from microns to meters
+        # Get coordinates (already in micrometers)
+        x = field_data.Ex.coords['x'].values  # Coordinates are already in micrometers
+        y = field_data.Ex.coords['y'].values  # Coordinates are already in micrometers
+        z = field_data.Ex.coords['z'].values  # Coordinates are already in micrometers
         
         # Handle frequency dimension if present
         if Ex.ndim == 4:  # (x, y, z, f) -> (423, 107, 69, 1)
@@ -109,9 +109,9 @@ class ModeVolumeAnalyzer:
         
         print(f"✓ Loaded 3D field data")
         print(f"  - Field shape: {Ex.shape}")
-        print(f"  - X range: {x.min()*1e6:.3f} to {x.max()*1e6:.3f} µm")
-        print(f"  - Y range: {y.min()*1e6:.3f} to {y.max()*1e6:.3f} µm")
-        print(f"  - Z range: {z.min()*1e6:.3f} to {z.max()*1e6:.3f} µm")
+        print(f"  - X range: {x.min():.3f} to {x.max():.3f} µm")
+        print(f"  - Y range: {y.min():.3f} to {y.max():.3f} µm")
+        print(f"  - Z range: {z.min():.3f} to {z.max():.3f} µm")
         
         return Ex, Ey, Ez, x, y, z
     
@@ -144,8 +144,9 @@ class ModeVolumeAnalyzer:
         
         xmin_um, ymin_um = np.array(bbox[0]) * gds_scale_cavity  # µm
         xmax_um, ymax_um = np.array(bbox[1]) * gds_scale_cavity  # µm
-        xmin_m, xmax_m = xmin_um * 1e-6, xmax_um * 1e-6  # meters
-        ymin_m, ymax_m = ymin_um * 1e-6, ymax_um * 1e-6  # meters
+        # Field coordinates are already in micrometers, so keep GDS coordinates in micrometers
+        xmin_m, xmax_m = xmin_um, xmax_um  # Keep in micrometers
+        ymin_m, ymax_m = ymin_um, ymax_um  # Keep in micrometers
         
         print(f"  - Cavity bounds: x[{xmin_um:.3f}, {xmax_um:.3f}] µm, "
               f"y[{ymin_um:.3f}, {ymax_um:.3f}] µm")
@@ -163,7 +164,7 @@ class ModeVolumeAnalyzer:
         for poly in getattr(hole_cell, "polygons", []):
             if (poly.layer, poly.datatype) == (self.hole_layer, self.hole_dtype):
                 verts_um = np.array(poly.points, float) * gds_scale_holes  # µm
-                hole_paths.append(MPLPath(verts_um * 1e-6))  # Convert to meters
+                hole_paths.append(MPLPath(verts_um))  # Keep in micrometers
         
         print(f"  - Found {len(hole_paths)} hole polygons")
         
@@ -188,7 +189,7 @@ class ModeVolumeAnalyzer:
         mask_xy = mask_core & (~mask_holes)  # (Ny, Nx)
         
         # Extrude across slab thickness (−t/2..+t/2)
-        t_half = 0.5 * self.thickness_um * 1e-6  # meters
+        t_half = 0.5 * self.thickness_um  # micrometers
         mask_z = (z >= -t_half) & (z <= +t_half)  # (Nz,)
         mask_3d = mask_z[:, None, None] & mask_xy[None, :, :]  # (Nz, Ny, Nx)
         
@@ -216,16 +217,16 @@ class ModeVolumeAnalyzer:
         """
         print("\n📊 Computing effective mode volume...")
         
-        # Calculate volume element - this matches the original implementation
+        # Calculate volume element (coordinates are in micrometers)
         dx = float(np.mean(np.diff(x))) if x.size > 1 else (x.max() - x.min()) / max(Ex.shape[2], 1)
         dy = float(np.mean(np.diff(y))) if y.size > 1 else (y.max() - y.min()) / max(Ex.shape[1], 1)
         if z.size > 1:
             dz = float(np.mean(np.diff(z)))
         else:
             # If monitor had only a single z slice, distribute across the slab
-            dz = (self.thickness_um * 1e-6) / max(Ex.shape[0], 1)
+            dz = self.thickness_um / max(Ex.shape[0], 1)
         
-        dV = dx * dy * dz
+        dV = dx * dy * dz  # Volume element in µm³
         
         print(f"  - Volume element: {dV*1e18:.3f} µm³")
         
@@ -239,7 +240,8 @@ class ModeVolumeAnalyzer:
             raise ValueError("Maximum field intensity is zero or negative")
         
         # Compute mode volume: V_eff = ∫ ε|E|² dV / max(ε|E|²)
-        numerator = np.sum(eps_E_squared) * dV
+        # dV is in µm³, so convert to m³ for final result
+        numerator = np.sum(eps_E_squared) * dV * 1e-18  # Convert µm³ to m³
         V_eff = numerator / max_eps_E_squared
         
         print(f"  - Maximum ε|E|²: {max_eps_E_squared:.2e}")

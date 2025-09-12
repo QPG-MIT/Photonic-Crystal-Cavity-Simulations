@@ -327,13 +327,19 @@ class NearFieldAnalyzer:
         # Overlay structure outline
         self._add_structure_outline_nearfield(axes[0], x, y)
 
-        # 2) Ex (real)
+        # 2) Ex (real) - with symmetric colormap limits
+        ex_real = np.real(Ex2)
+        vmax_ex = np.max(np.abs(ex_real))
+        vmin_ex = -vmax_ex
+        
         im2 = axes[1].imshow(
-            np.real(Ex2),
+            ex_real,
             extent=[x.min(), x.max(), y.min(), y.max()],
             origin="lower",
             cmap=bipolar_cmap,
             aspect="equal",
+            vmin=vmin_ex,
+            vmax=vmax_ex,
         )
         axes[1].set_title("Ex (real)", fontsize=14, fontweight="bold")
         axes[1].set_xlabel("x (µm)")
@@ -344,13 +350,19 @@ class NearFieldAnalyzer:
         # Overlay structure outline in dark grey
         self._add_structure_outline_nearfield(axes[1], x, y, color="darkgrey")
 
-        # 3) Ey (real)
+        # 3) Ey (real) - with symmetric colormap limits
+        ey_real = np.real(Ey2)
+        vmax_ey = np.max(np.abs(ey_real))
+        vmin_ey = -vmax_ey
+        
         im3 = axes[2].imshow(
-            np.real(Ey2),
+            ey_real,
             extent=[x.min(), x.max(), y.min(), y.max()],
             origin="lower",
             cmap=bipolar_cmap,
             aspect="equal",
+            vmin=vmin_ey,
+            vmax=vmax_ey,
         )
         axes[2].set_title("Ey (real)", fontsize=14, fontweight="bold")
         axes[2].set_xlabel("x (µm)")
