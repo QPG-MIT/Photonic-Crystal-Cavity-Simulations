@@ -18,6 +18,10 @@ from scipy.signal import hilbert
 from scipy.interpolate import griddata
 from scipy.ndimage import gaussian_filter
 from typing import Dict, Tuple, Optional
+try:
+    from .plot_style import apply_theme, PALETTE, mono_cmap, bipolar_cmap
+except ImportError:
+    from plot_style import apply_theme, PALETTE, mono_cmap, bipolar_cmap
 
 # Suppress warnings for cleaner output
 warnings.filterwarnings('ignore')
@@ -441,6 +445,8 @@ class FarFieldAnalyzer:
         Create comprehensive far-field visualization plots
         """
         print("\n📊 Creating far-field analysis plots...")
+        apply_theme()
+
         
         # Find angular monitor for collection efficiency vs NA plot
         angular_monitor = None
@@ -488,10 +494,11 @@ class FarFieldAnalyzer:
                 I_oriented = self._orient_for_imshow(I, kx, ky)
                 
                 im = ax.imshow(I_oriented, extent=[kx.min(), kx.max(), ky.min(), ky.max()], 
-                              origin='lower', cmap='hot', aspect='auto')
+                              origin='lower', cmap=mono_cmap, aspect='auto')
                 ax.set_xlabel('kx (1/µm)')
                 ax.set_ylabel('ky (1/µm)')
-                ax.set_title(f'{monitor_name}\nK-space')
+                ax.set_title('K-Space Far-Field Distribution')
+                ax.grid(False)
                 
             elif 'angles' in monitor_name and 'theta' in coords and 'phi' in coords:
                 # Angular plot
@@ -513,12 +520,13 @@ class FarFieldAnalyzer:
                         theta_min, theta_max = theta_2d.min(), theta_2d.max()
                         phi_min, phi_max = phi_2d.min(), phi_2d.max()
                         im = ax.imshow(I, extent=[phi_min, phi_max, theta_min, theta_max], 
-                                      origin='lower', cmap='hot', aspect='auto')
+                                      origin='lower', cmap=mono_cmap, aspect='auto')
                     else:
                         im = ax.imshow(I, extent=[phi_2d.min(), phi_2d.max(), theta_2d.min(), theta_2d.max()], 
-                                      origin='lower', cmap='hot', aspect='auto')
+                                      origin='lower', cmap=mono_cmap, aspect='auto')
                     ax.set_xlabel('φ (deg)')
                     ax.set_ylabel('θ (deg)')
+                    ax.grid(False)
                 elif len(I.shape) == 3:
                     # 3D pattern - remove frequency dimension for plotting
                     I_2d = I[0, :, :]  # Remove frequency dimension
@@ -533,9 +541,10 @@ class FarFieldAnalyzer:
                     theta_min, theta_max = theta_2d.min(), theta_2d.max()
                     phi_min, phi_max = phi_2d.min(), phi_2d.max()
                     im = ax.imshow(I_2d, extent=[phi_min, phi_max, theta_min, theta_max], 
-                                  origin='lower', cmap='hot', aspect='auto')
+                                  origin='lower', cmap=mono_cmap, aspect='auto')
                     ax.set_xlabel('φ (deg)')
                     ax.set_ylabel('θ (deg)')
+                    ax.grid(False)
                 else:
                     # 1D pattern
                     if theta.ndim > 1:
@@ -544,15 +553,17 @@ class FarFieldAnalyzer:
                         theta_1d = theta
                     # Ensure I is 1D for plotting
                     I_1d = I.flatten() if I.ndim > 1 else I
-                    ax.plot(theta_1d, I_1d, 'b-', linewidth=2)
+                    ax.plot(theta_1d, I_1d, linewidth=2, color=PALETTE[0])
                     ax.set_xlabel('θ (deg)')
                     ax.set_ylabel('Intensity')
-                ax.set_title(f'{monitor_name}\nRadiation Pattern')
+                    ax.grid(False)
+                ax.set_title('Angular Radiation Pattern')
                 
             else:
                 # Generic plot
-                im = ax.imshow(I, cmap='hot', aspect='auto')
-                ax.set_title(f'{monitor_name}\nIntensity')
+                im = ax.imshow(I, cmap=mono_cmap, aspect='auto')
+                ax.set_title('Far-Field Intensity Distribution')
+                ax.grid(False)
             
             # Add colorbar for image plots
             if 'im' in locals():
@@ -616,80 +627,18 @@ class FarFieldAnalyzer:
             collection_efficiency = collected_power / total_power if total_power > 0 else 0
             collection_efficiencies.append(collection_efficiency)
         
-        # Create separate figure with better styling
-        fig, ax = plt.subplots(1, 1, figsize=(12, 8))
-        
-        # Convert to percentage
+        apply_theme()
+        fig, ax = plt.subplots()
         eff_percent = np.array(collection_efficiencies) * 100
-        
-        # Plot collection efficiency vs NA with enhanced styling
-        ax.plot(na_values, eff_percent, 'b-', linewidth=3, marker='o', markersize=6, 
-                markerfacecolor='lightblue', markeredgecolor='darkblue', markeredgewidth=1.5,
-                label='Collection Efficiency')
-        
-        # Enhanced styling
-        ax.set_xlabel('Numerical Aperture (NA)', fontsize=14, fontweight='bold')
-        ax.set_ylabel('Collection Efficiency (%)', fontsize=14, fontweight='bold')
-        ax.set_title('Collection Efficiency vs Numerical Aperture\n(Full Sphere Collection)', 
-                    fontsize=16, fontweight='bold', pad=20)
-        
-        # Enhanced grid
-        ax.grid(True, alpha=0.4, linestyle='-', linewidth=0.5)
-        ax.set_xlim(0, 1.0)
-        ax.set_ylim(0, max(60, max(eff_percent) * 1.1))  # Dynamic y-limit
-        
-        # Add current NA marker with enhanced styling
+        ax.plot(na_values, eff_percent, marker='o', linewidth=2.5, markersize=6, color=PALETTE[0])
         current_na = self.NA
         current_eff = np.interp(current_na, na_values, collection_efficiencies) * 100
-        
-        # Vertical line for current NA
-        ax.axvline(current_na, color='red', linestyle='--', alpha=0.8, linewidth=3, 
-                  label=f'Current NA = {current_na}')
-        
-        # Horizontal line for current efficiency
-        ax.axhline(current_eff, color='red', linestyle='--', alpha=0.8, linewidth=3)
-        
-        # Add a marker at the current point
-        ax.plot(current_na, current_eff, 'ro', markersize=10, markerfacecolor='red', 
-                markeredgecolor='darkred', markeredgewidth=2, zorder=5)
-        
-        # Enhanced legend
-        ax.legend(fontsize=12, loc='lower right', framealpha=0.9, 
-                 fancybox=True, shadow=True)
-        
-        # Enhanced text annotation with better positioning
-        ax.text(0.02, 0.98, f'Current Configuration:\nNA = {current_na}\nEfficiency = {current_eff:.1f}%', 
-                transform=ax.transAxes, verticalalignment='top', fontsize=12, fontweight='bold',
-                bbox=dict(boxstyle='round,pad=0.5', facecolor='lightyellow', 
-                         edgecolor='orange', alpha=0.9, linewidth=2))
-        
-        # Add some key NA markers for reference
-        key_nas = [0.1, 0.3, 0.5, 0.7, 0.9]
-        for na in key_nas:
-            if na != current_na:  # Don't duplicate current NA
-                eff = np.interp(na, na_values, collection_efficiencies) * 100
-                ax.axvline(na, color='gray', linestyle=':', alpha=0.5, linewidth=1)
-                ax.text(na, max(eff_percent) * 0.95, f'{na}', ha='center', va='bottom', 
-                       fontsize=9, color='gray', alpha=0.7)
-        
-        # Add efficiency milestones
-        milestones = [25, 50, 75]
-        for milestone in milestones:
-            if milestone <= max(eff_percent):
-                ax.axhline(milestone, color='green', linestyle=':', alpha=0.5, linewidth=1)
-                ax.text(0.98, milestone, f'{milestone}%', ha='right', va='center', 
-                       fontsize=9, color='green', alpha=0.7)
-        
-        # Improve tick formatting
-        ax.tick_params(axis='both', which='major', labelsize=11, width=1.5, length=6)
-        ax.tick_params(axis='both', which='minor', width=1, length=3)
-        
-        # Add minor ticks
-        ax.minorticks_on()
-        
-        # Set background color
-        ax.set_facecolor('#f8f9fa')
-        
+        ax.axvline(current_na, linestyle='--', color=PALETTE[1], alpha=1, linewidth=1, zorder=-1)
+        ax.axhline(current_eff, linestyle='--', color=PALETTE[2], alpha=1, linewidth=1, zorder=-1)
+        ax.set_xlabel('Numerical Aperture (NA)')
+        ax.set_ylabel('Collection Efficiency (%)')
+        ax.set_title('Collection Efficiency vs Numerical Aperture')
+        ax.grid(False)
         plt.tight_layout()
         plt.savefig('collection_efficiency_vs_na.png', dpi=300, bbox_inches='tight')
         plt.show()

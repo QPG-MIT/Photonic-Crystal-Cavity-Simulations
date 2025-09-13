@@ -17,6 +17,7 @@ import warnings
 from scipy.interpolate import griddata
 from scipy.ndimage import gaussian_filter
 from typing import Dict, Tuple, Optional
+from .plot_style import apply_theme, PALETTE, mono_cmap, bipolar_cmap
 
 # Suppress warnings for cleaner output
 warnings.filterwarnings('ignore')
@@ -485,6 +486,8 @@ class CollectionEfficiencyAnalyzer:
         Create comprehensive collection efficiency visualization plots
         """
         print("\n📊 Creating collection efficiency plots...")
+        apply_theme()
+
         
         # Create figure with subplots
         fig, axes = plt.subplots(2, 2, figsize=(16, 12))
@@ -500,7 +503,7 @@ class CollectionEfficiencyAnalyzer:
                 efficiencies.append(monitor_results['collection_efficiency'])
         
         if monitor_names:
-            bars = ax1.bar(monitor_names, efficiencies, color='skyblue', alpha=0.7)
+            bars = ax1.bar(monitor_names, efficiencies, alpha=0.7, color=PALETTE[0])
             ax1.set_ylabel('Collection Efficiency')
             ax1.set_title('Collection Efficiency by Monitor')
             ax1.set_ylim(0, 1)
@@ -525,8 +528,8 @@ class CollectionEfficiencyAnalyzer:
             x = np.arange(len(monitor_names))
             width = 0.35
             
-            ax2.bar(x - width/2, total_powers, width, label='Total Power', alpha=0.7)
-            ax2.bar(x + width/2, collected_powers, width, label='Collected Power', alpha=0.7)
+            ax2.bar(x - width/2, total_powers, width, label='Total Power', alpha=0.7, color=PALETTE[1])
+            ax2.bar(x + width/2, collected_powers, width, label='Collected Power', alpha=0.7, color=PALETTE[2])
             ax2.set_xlabel('Monitor')
             ax2.set_ylabel('Power')
             ax2.set_title('Power Distribution')
@@ -543,10 +546,10 @@ class CollectionEfficiencyAnalyzer:
             # This is a simplified model - in practice would need more sophisticated calculation
             theoretical_efficiencies = [0.1, 0.3, 0.5, 0.7, 0.9, 1.0]
             
-            ax3.plot(nas, theoretical_efficiencies, 'b-', label='Theoretical', linewidth=2)
-            ax3.axvline(x=self.NA, color='r', linestyle='--', label=f'Current NA = {self.NA}')
-            ax3.axhline(y=results['overall']['overall_efficiency'], color='r', linestyle='--', 
-                       label=f'Measured = {results["overall"]["overall_efficiency"]:.3f}')
+            ax3.plot(nas, theoretical_efficiencies, label='Theoretical', linewidth=2, color=PALETTE[0])
+            ax3.axvline(x=self.NA, linestyle='--', label=f'Current NA = {self.NA}', color=PALETTE[1])
+            ax3.axhline(y=results['overall']['overall_efficiency'], linestyle='--', 
+                       label=f'Measured = {results["overall"]["overall_efficiency"]:.3f}', color=PALETTE[2])
             ax3.set_xlabel('Numerical Aperture')
             ax3.set_ylabel('Collection Efficiency')
             ax3.set_title('Collection Efficiency vs NA')
@@ -565,7 +568,7 @@ class CollectionEfficiencyAnalyzer:
                 overall.get('min_efficiency', 0)
             ]
             
-            bars = ax4.bar(stats, values, color=['red', 'blue', 'green', 'orange'], alpha=0.7)
+            bars = ax4.bar(stats, values, alpha=0.7, color=PALETTE[3])
             ax4.set_ylabel('Collection Efficiency')
             ax4.set_title('Collection Efficiency Statistics')
             ax4.set_ylim(0, 1)

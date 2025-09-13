@@ -54,12 +54,24 @@ Previous/
 *.tmp
 *.temp
 
+# Analysis results and visualizations (generated files)
+*.png
+*_results.json
+*_analysis_results.json
+*_analysis_report.json
+*_report.json
+*_summary.json
+
+# Fine resolution results (large files, ignore to save space)
+results_*_fine.hdf5
+results_*_fine.json
+
 # Include only essential files by explicitly tracking them
 # The following files will be tracked:
 # - modules/ (all Python files)
 # - *.gds files
 # - *.ipynb files
-# - results_*.hdf5 files
+# - results_*.hdf5 files (except fine resolution)
 # - run_complete_analysis.py
 # - requirements.txt
 # - README.md (if created)
