@@ -141,8 +141,8 @@ def build_default_workflow_config(
         name="scout",
         run_time_ps=12.0,
         bandwidth_rel=0.12,
-        simulation_path=Path(f"simulation_scout_{tag}um.json"),
-        results_path=Path(f"results_scout_{tag}um.hdf5"),
+        simulation_path=Path(f"simulation_scout_q_only_{tag}um.json"),
+        results_path=Path(f"results_scout_q_only_{tag}um.hdf5"),
         summary_path=Path(f"scout_summary_{tag}um.json"),
         task_name=f"photonic_cavity_scout_{tag}um",
     )
@@ -150,8 +150,8 @@ def build_default_workflow_config(
         name="lockin",
         run_time_ps=8.0,
         bandwidth_rel=0.02,
-        simulation_path=Path(f"simulation_lockin_{tag}um.json"),
-        results_path=Path(f"results_lockin_{tag}um.hdf5"),
+        simulation_path=Path(f"simulation_lockin_full_{tag}um.json"),
+        results_path=Path(f"results_lockin_full_{tag}um.hdf5"),
         summary_path=Path(f"lockin_summary_{tag}um.json"),
         task_name=f"photonic_cavity_lockin_{tag}um",
     )
@@ -196,7 +196,9 @@ def config_from_args(args: argparse.Namespace) -> WorkflowConfig:
         config.lockin.summary_path = Path(args.lockin_summary)
 
     # Simulation execution flags
-    if args.run_sims:
+    # Default: run simulations unless explicitly disabled via CLI
+    want_run = True if args.run_sims is None else args.run_sims
+    if want_run:
         if config.stage in {"all", "scout"}:
             config.scout.run_simulation = True
             config.scout.estimate_cost = args.estimate_cost
@@ -248,7 +250,7 @@ def run_scout_stage(config: WorkflowConfig) -> Dict[str, Any]:
         wavelength_um=config.initial_wavelength_um,
         source_bandwidth_rel=stage.bandwidth_rel,
     )
-    simulation = setup.create_simulation(run_time_ps=stage.run_time_ps)
+    simulation = setup.create_q_scout_simulation(run_time_ps=stage.run_time_ps)
     setup.save_simulation(simulation, str(stage.simulation_path))
 
     if stage.run_simulation:
@@ -258,6 +260,7 @@ def run_scout_stage(config: WorkflowConfig) -> Dict[str, Any]:
             results_path=str(stage.results_path),
             force_rerun=stage.force_rerun,
             estimate_cost_first=stage.estimate_cost,
+            expected_monitors=["probe"],
         )
     else:
         if stage.results_path.exists():
@@ -344,6 +347,15 @@ def run_lockin_stage(config: WorkflowConfig, resonance_summary: Dict[str, Any]) 
             results_path=str(stage.results_path),
             force_rerun=stage.force_rerun,
             estimate_cost_first=stage.estimate_cost,
+            expected_monitors=[
+                "probe",
+                "flux",
+                "field_near",
+                "farfield_cartesian",
+                "farfield_kspace",
+                "farfield_angles",
+                "fld_3d_box",
+            ],
         )
     else:
         if stage.results_path.exists():
@@ -538,6 +550,8 @@ def run_complete_analysis(config: Optional[WorkflowConfig] = None) -> Dict[str, 
 def parse_args(argv: Optional[list] = None) -> argparse.Namespace:
     """Parse command-line arguments."""
 
+    thickness_um = 0.16 # default thickness
+
     parser = argparse.ArgumentParser(
         description="Run the two-pass photonic cavity analysis workflow.",
     )
@@ -547,7 +561,7 @@ def parse_args(argv: Optional[list] = None) -> argparse.Namespace:
         default="all",
         help="Which stage(s) to run.",
     )
-    parser.add_argument("--thickness-um", type=float, default=0.14, help="Device thickness in micrometers.")
+    parser.add_argument("--thickness-um", type=float, default=thickness_um, help="Device thickness in micrometers.")
     parser.add_argument(
         "--initial-wavelength-um",
         type=float,
@@ -576,12 +590,26 @@ def parse_args(argv: Optional[list] = None) -> argparse.Namespace:
     parser.add_argument(
         "--run-sims",
         action="store_true",
-        help="Actually submit simulations (otherwise existing results are used).",
+        default=None,
+        help="Run simulations (default). Use --no-run-sims to skip running.",
+    )
+    parser.add_argument(
+        "--no-run-sims",
+        dest="run_sims",
+        action="store_false",
+        help="Do not submit simulations; only use existing results.",
     )
     parser.add_argument(
         "--estimate-cost",
         action="store_true",
-        help="Estimate simulation cost before submission (only with --run-sims).",
+        default=True,
+        help="Estimate simulation cost before submission (default).",
+    )
+    parser.add_argument(
+        "--no-estimate-cost",
+        dest="estimate_cost",
+        action="store_false",
+        help="Skip cost estimation before running simulations.",
     )
     parser.add_argument(
         "--force-rerun",
