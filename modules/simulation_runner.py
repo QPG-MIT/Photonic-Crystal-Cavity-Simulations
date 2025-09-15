@@ -235,7 +235,8 @@ class SimulationRunner:
                 simulation,
                 task_name=task_name,
                 folder_name="default",
-                path=results_path
+                path=results_path,
+                verbose=True
             )
             
             elapsed_time = time.time() - start_time

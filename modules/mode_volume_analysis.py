@@ -39,13 +39,11 @@ def _sellmeier_diamond(wavelength_um: float) -> float:
          Phys. Status Solidi A 172, 15 (1999). (Table 1, natural diamond)
     """
     lambda_sq_um = wavelength_um**2
-    # Sellmeier coefficients for natural diamond
-    A1 = 0.3306
-    L1 = 0.106
-    A2 = 4.3356
-    L2 = 0.337
+    # Sellmeier coefficients for natural diamond (matching simulation_setup.py)
+    B1, C1 = 0.3306, 0.175**2
+    B2, C2 = 4.3356, 0.106**2
 
-    n_sq = 1 + (A1 * lambda_sq_um) / (lambda_sq_um - L1**2) + (A2 * lambda_sq_um) / (lambda_sq_um - L2**2)
+    n_sq = 1.0 + B1 * lambda_sq_um / (lambda_sq_um - C1) + B2 * lambda_sq_um / (lambda_sq_um - C2)
     return np.sqrt(n_sq)
 
 
