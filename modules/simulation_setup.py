@@ -36,16 +36,21 @@ class SimulationSetup:
     Handles the setup and configuration of Tidy3D simulations for photonic cavities.
     """
     
-    def __init__(self, thickness_um: float = 0.14, wavelength_um: float = 0.62):
+    def __init__(self,
+                 thickness_um: float = 0.14,
+                 wavelength_um: float = 0.62,
+                 source_bandwidth_rel: float = 0.12):
         """
         Initialize simulation setup parameters.
-        
+
         Args:
             thickness_um: Cavity thickness in micrometers
             wavelength_um: Analysis wavelength in micrometers
+            source_bandwidth_rel: Relative bandwidth (Δf/f₀) of the Gaussian source
         """
         self.thickness_um = thickness_um
         self.wavelength_um = wavelength_um
+        self.source_bandwidth_rel = source_bandwidth_rel
         self.params = self._setup_geometry_parameters()
         self.diamond_medium, self.clad_medium, self.f0_center = self._create_diamond_medium()
         
@@ -253,14 +258,14 @@ class SimulationSetup:
             center=(geom_params['cx'], geom_params['cy'], 0.0),
             source_time=td.GaussianPulse(
                 freq0=self.f0_center,
-                fwidth=self.f0_center * 0.12,  # 12% bandwidth
+                fwidth=self.f0_center * self.source_bandwidth_rel,
             ),
             polarization="Ey",
         )
-        
+
         print(f"  - Source: Point dipole at ({geom_params['cx']:.3f}, {geom_params['cy']:.3f}, 0.0)")
         print(f"  - Frequency: {self.f0_center/1e12:.3f} THz")
-        print(f"  - Bandwidth: {self.f0_center * 0.12/1e12:.2f} THz")
+        print(f"  - Bandwidth: {self.f0_center * self.source_bandwidth_rel/1e12:.2f} THz")
         
         # Create basic monitors
         monitors = []
@@ -295,6 +300,29 @@ class SimulationSetup:
         print(f"  - Created {len(monitors)} basic monitors")
         
         return source, monitors
+
+    def create_minimal_q_probe(self, geom_params: Dict) -> Tuple[td.PointDipole, List[td.Monitor]]:
+        """Create a minimal source and only the time-domain probe needed for Q analysis."""
+        print("\n📡 Creating minimal source and Q-probe monitor...")
+
+        source = td.PointDipole(
+            center=(geom_params['cx'], geom_params['cy'], 0.0),
+            source_time=td.GaussianPulse(
+                freq0=self.f0_center,
+                fwidth=self.f0_center * self.source_bandwidth_rel,
+            ),
+            polarization="Ey",
+        )
+
+        probe_monitor = td.FieldTimeMonitor(
+            center=(geom_params['cx'], geom_params['cy'], 0.0),
+            size=(0, 0, 0),
+            name="probe",
+            interval=5,
+        )
+
+        print("  - Created minimal monitor set: ['probe']")
+        return source, [probe_monitor]
     
     def create_farfield_monitors(self, geom_params: Dict) -> List[td.Monitor]:
         """Create improved far-field monitors."""
@@ -412,6 +440,41 @@ class SimulationSetup:
         print(f"  - Grid: min_steps_per_wvl=18 with wavelength={self.wavelength_um} µm")
         print(f"  - Boundaries: PML(8 layers)")
         
+        return simulation
+
+    def create_q_scout_simulation(self, run_time_ps: float = 10.0) -> td.Simulation:
+        """Create a simplified simulation for the scout stage (Q-only probe)."""
+        print("\n🚀 Creating minimal scout simulation (Q-only)...")
+
+        # Extract geometry
+        geom_params = self.extract_geometry_from_gds()
+
+        # Create structures
+        core_struct = self.create_core_structure(geom_params)
+        hole_structs = self.create_hole_structures(geom_params)
+        all_structures = [core_struct] + hole_structs
+
+        # Create minimal source + probe
+        source, probe_monitors = self.create_minimal_q_probe(geom_params)
+
+        # Create simulation with specified run time
+        run_time = run_time_ps * 1e-12  # Convert ps to seconds
+
+        simulation = td.Simulation(
+            size=(geom_params['size_x'], geom_params['size_y'], geom_params['size_z']),
+            center=(geom_params['cx'], geom_params['cy'], geom_params['cz']),
+            grid_spec=td.GridSpec.auto(min_steps_per_wvl=18, wavelength=self.wavelength_um),
+            structures=all_structures,
+            sources=[source],
+            monitors=probe_monitors,
+            run_time=run_time,
+            boundary_spec=td.BoundarySpec.all_sides(boundary=td.PML()),
+        )
+
+        print(f"✓ Minimal scout simulation created successfully")
+        print(f"  - Structures: {len(all_structures)}")
+        print(f"  - Monitors: {len(probe_monitors)} (probe only)")
+        print(f"  - Run time: {run_time_ps:.1f} ps")
         return simulation
     
     def save_simulation(self, simulation: td.Simulation, filename: str) -> None:
