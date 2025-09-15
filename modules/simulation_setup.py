@@ -36,16 +36,21 @@ class SimulationSetup:
     Handles the setup and configuration of Tidy3D simulations for photonic cavities.
     """
     
-    def __init__(self, thickness_um: float = 0.14, wavelength_um: float = 0.62):
+    def __init__(self,
+                 thickness_um: float = 0.14,
+                 wavelength_um: float = 0.62,
+                 source_bandwidth_rel: float = 0.12):
         """
         Initialize simulation setup parameters.
-        
+
         Args:
             thickness_um: Cavity thickness in micrometers
             wavelength_um: Analysis wavelength in micrometers
+            source_bandwidth_rel: Relative bandwidth (Δf/f₀) of the Gaussian source
         """
         self.thickness_um = thickness_um
         self.wavelength_um = wavelength_um
+        self.source_bandwidth_rel = source_bandwidth_rel
         self.params = self._setup_geometry_parameters()
         self.diamond_medium, self.clad_medium, self.f0_center = self._create_diamond_medium()
         
@@ -253,14 +258,14 @@ class SimulationSetup:
             center=(geom_params['cx'], geom_params['cy'], 0.0),
             source_time=td.GaussianPulse(
                 freq0=self.f0_center,
-                fwidth=self.f0_center * 0.12,  # 12% bandwidth
+                fwidth=self.f0_center * self.source_bandwidth_rel,
             ),
             polarization="Ey",
         )
-        
+
         print(f"  - Source: Point dipole at ({geom_params['cx']:.3f}, {geom_params['cy']:.3f}, 0.0)")
         print(f"  - Frequency: {self.f0_center/1e12:.3f} THz")
-        print(f"  - Bandwidth: {self.f0_center * 0.12/1e12:.2f} THz")
+        print(f"  - Bandwidth: {self.f0_center * self.source_bandwidth_rel/1e12:.2f} THz")
         
         # Create basic monitors
         monitors = []
