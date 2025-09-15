@@ -286,7 +286,7 @@ class NearFieldAnalyzer:
         wavelength_um = self.wavelength_um
         
         # Method 1: Estimate from mode area and wavelength
-        # For a Gaussian mode, A_eff ≈ π * w₀², where w₀ is the beam waist
+        # For a Gaussian mode, A_eff ≈ π * w0², where w0 is the beam waist
         # The effective index relates to the mode size and wavelength
         if A_eff > 0 and wavelength_um > 0:
             # Estimate beam waist from effective area (assuming circular mode)

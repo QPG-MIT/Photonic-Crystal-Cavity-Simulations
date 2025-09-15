@@ -46,7 +46,7 @@ class SimulationSetup:
         Args:
             thickness_um: Cavity thickness in micrometers
             wavelength_um: Analysis wavelength in micrometers
-            source_bandwidth_rel: Relative bandwidth (Δf/f₀) of the Gaussian source
+            source_bandwidth_rel: Relative bandwidth (Δf/f0) of the Gaussian source
         """
         self.thickness_um = thickness_um
         self.wavelength_um = wavelength_um
@@ -121,7 +121,7 @@ class SimulationSetup:
 
         print(f"  - Using Sellmeier dispersion evaluated at λ={self.wavelength_um:.3f} µm")
         print(f"  - n(λ) = {n_diamond:.6f} → ε = {n_diamond**2:.6f}")
-        print(f"  - Note: medium is set with ε(λ₀); full dispersion not invoked for narrowband run")
+        print(f"  - Note: medium is set with ε(λ0); full dispersion not invoked for narrowband run")
 
         # Create media
         diamond_medium = td.Medium(permittivity=n_diamond**2)
