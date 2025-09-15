@@ -152,8 +152,9 @@ class NearFieldAnalyzer:
         """
         span_x = float(x.max() - x.min()) if x.size else 0.0
         span_y = float(y.max() - y.min()) if y.size else 0.0
-        # Heuristic: if the window is < 1e-3 units (~1 mm) we treat it as meters and convert.
-        if span_x < 1e-3 and span_y < 1e-3:
+        # Heuristic: if EITHER axis span is < 1e-3 (likely in meters), convert BOTH to µm.
+        # This prevents mismatched units across axes.
+        if max(span_x, span_y) < 1e-3:
             return x * 1e6, y * 1e6
         return x, y
 
@@ -303,21 +304,37 @@ class NearFieldAnalyzer:
 
         fig, axes = plt.subplots(3, 1, figsize=(12, 8))
 
+        # Compute edge-aware extents to avoid visual shrink/stretch on coarse/nonuniform grids
+        def _edges_from_centers(coords: np.ndarray) -> (float, float):
+            if coords.size == 0:
+                return 0.0, 1.0
+            if coords.size == 1:
+                return float(coords[0] - 0.5), float(coords[0] + 0.5)
+            diffs = np.diff(coords)
+            step = float(np.median(diffs))
+            return float(coords.min() - 0.5 * step), float(coords.max() + 0.5 * step)
+
+        x_ext_min, x_ext_max = _edges_from_centers(x)
+        y_ext_min, y_ext_max = _edges_from_centers(y)
+
         # Calculate colormap limits for better visibility (crop to show 1-99th percentile)
         vmin_linear = np.percentile(I, 0.1)
         vmax_linear = np.percentile(I, 99.9)
 
-        # 1) Field Intensity
-        im1 = axes[0].imshow(
+        # Prepare coordinate mesh for non-uniform grids
+        XX, YY = np.meshgrid(x, y, indexing="xy")  # (Ny, Nx)
+
+        # 1) Field Intensity (use pcolormesh to respect non-uniform spacing)
+        im1 = axes[0].pcolormesh(
+            XX,
+            YY,
             I,
-            extent=[x.min(), x.max(), y.min(), y.max()],
-            origin="lower",
+            shading="auto",
             cmap=mono_cmap,
-            aspect="equal",
-            alpha=1,
             vmin=vmin_linear,
             vmax=vmax_linear,
         )
+        axes[0].set_aspect("equal")
         axes[0].set_title("Field Intensity", fontsize=14, fontweight="bold")
         axes[0].set_xlabel("x (µm)")
         axes[0].set_ylabel("y (µm)")
@@ -332,15 +349,16 @@ class NearFieldAnalyzer:
         vmax_ex = np.max(np.abs(ex_real))
         vmin_ex = -vmax_ex
         
-        im2 = axes[1].imshow(
+        im2 = axes[1].pcolormesh(
+            XX,
+            YY,
             ex_real,
-            extent=[x.min(), x.max(), y.min(), y.max()],
-            origin="lower",
+            shading="auto",
             cmap=bipolar_cmap,
-            aspect="equal",
             vmin=vmin_ex,
             vmax=vmax_ex,
         )
+        axes[1].set_aspect("equal")
         axes[1].set_title("Ex (real)", fontsize=14, fontweight="bold")
         axes[1].set_xlabel("x (µm)")
         axes[1].set_ylabel("y (µm)")
@@ -355,15 +373,16 @@ class NearFieldAnalyzer:
         vmax_ey = np.max(np.abs(ey_real))
         vmin_ey = -vmax_ey
         
-        im3 = axes[2].imshow(
+        im3 = axes[2].pcolormesh(
+            XX,
+            YY,
             ey_real,
-            extent=[x.min(), x.max(), y.min(), y.max()],
-            origin="lower",
+            shading="auto",
             cmap=bipolar_cmap,
-            aspect="equal",
             vmin=vmin_ey,
             vmax=vmax_ey,
         )
+        axes[2].set_aspect("equal")
         axes[2].set_title("Ey (real)", fontsize=14, fontweight="bold")
         axes[2].set_xlabel("x (µm)")
         axes[2].set_ylabel("y (µm)")
@@ -490,10 +509,13 @@ class NearFieldAnalyzer:
 
             # Map contour (row, col) -> (y, x) physical coords
             for c in contours:
-                rr = np.clip(c[:, 0].astype(int), 0, len(y) - 1)  # rows
-                cc = np.clip(c[:, 1].astype(int), 0, len(x) - 1)  # cols
-                yy = y[rr]
-                xx = x[cc]
+                # Use subpixel interpolation to avoid shrinking due to integer truncation
+                r = np.clip(c[:, 0], 0.0, len(y) - 1.0)
+                cidx = np.clip(c[:, 1], 0.0, len(x) - 1.0)
+                idx_y = np.arange(len(y), dtype=float)
+                idx_x = np.arange(len(x), dtype=float)
+                yy = np.interp(r, idx_y, y)
+                xx = np.interp(cidx, idx_x, x)
                 ax.plot(xx, yy, color=color, linewidth=1.2, alpha=1)
         except Exception as e:
             print(f"Warning: Could not add structure outline: {e}")

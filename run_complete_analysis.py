@@ -28,7 +28,7 @@ from modules.collection_efficiency_analysis import analyze_collection_efficiency
 
 # Physical constants
 C0 = 299792458.0  # Speed of light in vacuum (m/s)
-thickness_um = 0.18
+thickness_um = 0.14
 
 def run_complete_analysis():
     """
