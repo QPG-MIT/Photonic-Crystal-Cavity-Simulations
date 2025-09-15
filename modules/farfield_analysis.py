@@ -308,28 +308,53 @@ class FarFieldAnalyzer:
             # Extract profile through maximum
             if len(I.shape) == 2:
                 # 2D pattern
-                profile = I[max_idx[0], :] if max_idx[0] < I.shape[0] else I[:, max_idx[1]]
-                angles = theta if max_idx[0] < I.shape[0] else phi
+                # Choose the longer axis for better resolution
+                if I.shape[1] >= I.shape[0]:
+                    profile = I[max_idx[0], :]
+                    angles = theta if theta.ndim == 1 else theta[:, 0]
+                else:
+                    profile = I[:, max_idx[1]]
+                    angles = phi if phi.ndim == 1 else phi[0, :]
             else:
                 # 1D pattern
                 profile = I
-                angles = theta if len(theta) > len(phi) else phi
+                angles = theta if (np.size(theta) >= np.size(phi)) else phi
             
             # Find FWHM
             max_val = np.max(profile)
             half_max = max_val / 2
             
-            # Find indices where intensity is above half maximum
-            above_half = profile >= half_max
-            if np.any(above_half):
-                indices = np.where(above_half)[0]
-                width_deg = angles[indices[-1]] - angles[indices[0]]
-                return float(width_deg)
+            # Crossings where profile drops below half maximum
+            above = profile >= half_max
+            if not np.any(above):
+                return float('nan')
+            idx = np.where(above)[0]
+            i_lo, i_hi = int(idx[0]), int(idx[-1])
+            # Guard bounds
+            n = len(profile)
+            if i_lo <= 0 or i_hi >= n - 1:
+                # Peak too close to boundary; cannot determine FWHM reliably
+                return float('nan')
+            # Linear interpolate to half max on both sides
+            def interp_x(i0, i1):
+                x0, x1 = float(angles[i0]), float(angles[i1])
+                y0, y1 = float(profile[i0]), float(profile[i1])
+                if y1 == y0:
+                    return x0
+                t = (half_max - y0) / (y1 - y0)
+                t = np.clip(t, 0.0, 1.0)
+                return x0 + t * (x1 - x0)
+            # Left crossing
+            x_lo = interp_x(i_lo - 1, i_lo)
+            # Right crossing
+            x_hi = interp_x(i_hi, min(i_hi + 1, n - 1))
+            width = float(x_hi - x_lo)
+            return width
             
         except Exception as e:
             print(f"  - Warning: Could not calculate beam width: {e}")
         
-        return 0.0
+        return float('nan')
     
     def _calculate_collection_efficiency(self, results: Dict) -> Dict:
         """
@@ -408,7 +433,10 @@ class FarFieldAnalyzer:
             if theta_range_deg <= 90:  # Only upper hemisphere
                 # For symmetric structure, total emission is 2x the upper hemisphere
                 total_power_full_sphere = total_power * 2
+                # Collection efficiency should be calculated relative to the full sphere emission
                 collection_efficiency_full_sphere = collected_power / total_power_full_sphere
+                # The main collection_efficiency should also be relative to full sphere for consistency
+                collection_efficiency = collection_efficiency_full_sphere
                 hemisphere_note = "upper hemisphere only"
             else:  # Full sphere or other range
                 total_power_full_sphere = total_power
@@ -430,8 +458,7 @@ class FarFieldAnalyzer:
             print(f"  - Total power ({hemisphere_note}): {total_power:.2e}")
             print(f"  - Total power (full sphere): {total_power_full_sphere:.2e}")
             print(f"  - Collected power: {collected_power:.2e}")
-            print(f"  - Collection efficiency ({hemisphere_note}): {collection_efficiency:.3f} ({collection_efficiency*100:.1f}%)")
-            print(f"  - Collection efficiency (full sphere): {collection_efficiency_full_sphere:.3f} ({collection_efficiency_full_sphere*100:.1f}%)")
+            print(f"  - Collection efficiency: {collection_efficiency:.3f} ({collection_efficiency*100:.1f}%)")
             print(f"  - Collection angle: ±{np.degrees(theta_max):.1f}°")
             
         except Exception as e:

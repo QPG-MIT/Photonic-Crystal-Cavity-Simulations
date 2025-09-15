@@ -164,8 +164,7 @@ class CollectionEfficiencyAnalyzer:
             }
             
             hemisphere_note = collection_results.get('hemisphere_coverage', 'unknown')
-            print(f"  - Collection efficiency ({hemisphere_note}): {collection_results.get('collection_efficiency', 0):.3f}")
-            print(f"  - Collection efficiency (full sphere): {collection_results.get('collection_efficiency_full_sphere', 0):.3f}")
+            print(f"  - Collection efficiency: {collection_results.get('collection_efficiency', 0):.3f}")
             print(f"  - Total power ({hemisphere_note}): {collection_results.get('total_power', 0):.2e}")
             print(f"  - Total power (full sphere): {collection_results.get('total_power_full_sphere', 0):.2e}")
             print(f"  - Collected power: {collection_results.get('collected_power', 0):.2e}")
@@ -265,7 +264,10 @@ class CollectionEfficiencyAnalyzer:
             if theta_range_deg <= 90:  # Only upper hemisphere
                 # For symmetric structure, total emission is 2x the upper hemisphere
                 total_power_full_sphere = total_power * 2
+                # Collection efficiency should be calculated relative to the full sphere emission
                 collection_efficiency_full_sphere = collected_power / total_power_full_sphere
+                # The main collection_efficiency should also be relative to full sphere for consistency
+                collection_efficiency = collection_efficiency_full_sphere
                 hemisphere_note = "upper hemisphere only"
             else:  # Full sphere or other range
                 total_power_full_sphere = total_power
@@ -441,11 +443,12 @@ class CollectionEfficiencyAnalyzer:
             for monitor_name, monitor_results in results.items():
                 if 'collection_efficiency' in monitor_results:
                     efficiencies.append(monitor_results['collection_efficiency'])
-                    total_powers.append(monitor_results.get('total_power', 0))
+                    # Use full sphere power for proper weighting
+                    total_powers.append(monitor_results.get('total_power_full_sphere', monitor_results.get('total_power', 0)))
                     collected_powers.append(monitor_results.get('collected_power', 0))
             
             if efficiencies:
-                # Calculate weighted average
+                # Calculate weighted average using full sphere powers
                 total_power_sum = sum(total_powers)
                 collected_power_sum = sum(collected_powers)
                 overall_efficiency = collected_power_sum / total_power_sum if total_power_sum > 0 else 0

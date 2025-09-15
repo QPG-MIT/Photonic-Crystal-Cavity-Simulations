@@ -41,18 +41,20 @@ class SimulationRunner:
         self.task_name = task_name
         self.results_cache = {}
         # Attempt to configure web API from environment for clearer diagnostics
-        token = os.environ.get("TIDY3D_API_KEY")
+        api_key = os.environ.get("TIDY3D_API_KEY")
         region = os.environ.get("TIDY3D_REGION")
         try:
-            if token:
-                # Newer tidy3d versions expect api_key; older may accept token
+            if api_key:
+                web.configure(api_key=api_key, region=region)
+            else:
+                # If already authenticated, this is a no-op; otherwise prompts in interactive sessions
                 try:
-                    web.configure(api_key=token, region=region)
-                except TypeError:
-                    web.configure(token=token)
+                    web.login()
+                except Exception:
+                    pass
         except Exception as _cfg_exc:
             # Non-fatal; configuration can still occur elsewhere
-            print(f"⚠️  Tidy3D web.configure failed: {_cfg_exc}")
+            print(f"⚠️  Tidy3D web.configure/login failed: {_cfg_exc}")
         
     def load_simulation(self, sim_file: str) -> td.Simulation:
         """
@@ -132,7 +134,7 @@ class SimulationRunner:
             print(f"  - Reason: {repr(e)}")
             print(f"  - TIDY3D_API_KEY present in env: {has_token}")
             print(f"  - TIDY3D_REGION: {region}")
-            print("  - Tip: Ensure tidy3d.web.configure(token=..., region=...) is set in this process.")
+            print("  - Tip: On Tidy3D >=2.9, use tidy3d.web.configure(api_key=...) or tidy3d.web.login().")
             return None
     
     def check_existing_results(self, results_path: str, expected_monitors: Optional[list] = None) -> bool:

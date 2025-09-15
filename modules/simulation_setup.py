@@ -101,23 +101,45 @@ class SimulationSetup:
         }
     
     def _create_diamond_medium(self) -> Tuple[td.Medium, td.Medium, float]:
-        """Create diamond medium with correct refractive index for the analysis wavelength."""
+        """Create diamond medium using Sellmeier dispersion evaluated at λ."""
         print("\n🔬 Creating diamond medium...")
-        
-        # Diamond refractive index at 620nm (correct value)
-        n_diamond = 2.414
-        
-        print(f"  - n(λ={self.wavelength_um:.3f} µm) = {n_diamond:.6f} (correct for diamond at 620nm)")
-        print(f"  - Using constant permittivity (narrowband simulation)")
-        
-        # Create medium with correct refractive index
+
+        def n_diamond_sellmeier(lambda_um: float) -> float:
+            """Sellmeier model for diamond (λ in µm).
+
+            n^2(λ) = 1 + (B1 λ^2)/(λ^2 - C1) + (B2 λ^2)/(λ^2 - C2)
+            Coefficients from literature (valid roughly 0.23–5 µm):
+              B1=0.3306, C1=0.175^2; B2=4.3356, C2=0.106^2
+            """
+            lam2 = float(lambda_um)**2
+            B1, C1 = 0.3306, 0.175**2
+            B2, C2 = 4.3356, 0.106**2
+            n2 = 1.0 + B1 * lam2 / (lam2 - C1) + B2 * lam2 / (lam2 - C2)
+            return float(np.sqrt(n2))
+
+        n_diamond = n_diamond_sellmeier(self.wavelength_um)
+
+        print(f"  - Using Sellmeier dispersion evaluated at λ={self.wavelength_um:.3f} µm")
+        print(f"  - n(λ) = {n_diamond:.6f} → ε = {n_diamond**2:.6f}")
+        print(f"  - Note: medium is set with ε(λ₀); full dispersion not invoked for narrowband run")
+
+        # Create media
         diamond_medium = td.Medium(permittivity=n_diamond**2)
         clad_medium = td.Medium(permittivity=1.0)
-        
+
         # Calculate center frequency
         f0_center = C0 / (self.wavelength_um * 1e-6)
-        
+
         return diamond_medium, clad_medium, f0_center
+
+    @staticmethod
+    def diamond_n_sellmeier(lambda_um: float) -> float:
+        """Public helper: diamond refractive index n(λ) via Sellmeier (no prints)."""
+        lam2 = float(lambda_um)**2
+        B1, C1 = 0.3306, 0.175**2
+        B2, C2 = 4.3356, 0.106**2
+        n2 = 1.0 + B1 * lam2 / (lam2 - C1) + B2 * lam2 / (lam2 - C2)
+        return float(np.sqrt(n2))
     
     def extract_geometry_from_gds(self) -> Dict:
         """Extract geometry from GDS files with improved bounds."""

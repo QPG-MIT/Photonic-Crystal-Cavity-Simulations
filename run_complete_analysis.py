@@ -67,7 +67,6 @@ class WorkflowConfig:
     initial_wavelength_um: float = 0.650
     stage: str = "all"
     n_bg: float = 1.0
-    n_emitter: float = 2.414
     NA: float = 0.9
     resonance_wavelength_um: Optional[float] = None
     scout: Optional[StageOptions] = None
@@ -172,7 +171,6 @@ def config_from_args(args: argparse.Namespace) -> WorkflowConfig:
     )
     config.stage = args.stage
     config.n_bg = args.n_bg
-    config.n_emitter = args.n_emitter
     config.NA = args.na
     config.resonance_wavelength_um = args.resonance_wavelength_um
 
@@ -389,7 +387,6 @@ def run_lockin_stage(config: WorkflowConfig, resonance_summary: Dict[str, Any]) 
             thickness_um=config.thickness_um,
             wavelength_um=lockin_wavelength,
             Q=q_for_lockin,
-            n_emitter=config.n_emitter,
             save_results=True,
             create_plots=True,
         )
@@ -576,7 +573,6 @@ def parse_args(argv: Optional[list] = None) -> argparse.Namespace:
     )
     parser.add_argument("--na", type=float, default=0.9, help="Collection numerical aperture for far-field analyses.")
     parser.add_argument("--n-bg", type=float, default=1.0, help="Background refractive index.")
-    parser.add_argument("--n-emitter", type=float, default=2.414, help="Emitter refractive index for Purcell calculations.")
     parser.add_argument("--scout-run-time-ps", type=float, default=12.0, help="Scout simulation run time (ps).")
     parser.add_argument("--lockin-run-time-ps", type=float, default=8.0, help="Lock-in simulation run time (ps).")
     parser.add_argument("--scout-bandwidth", type=float, default=0.12, help="Relative bandwidth Δf/f₀ for the scout source.")

@@ -116,6 +116,10 @@ class NearFieldAnalyzer:
         print(f"  - Max intensity: {np.max(I):.2e}")
         print(f"  - Total power (sum of |E|^2): {np.sum(P):.2e}")
 
+        # Remember coords for mode-area integration spacing
+        self._last_x_um = x
+        self._last_y_um = y
+
         # ----------------------------- Analyses --------------------------------
         confinement_results = self._analyze_field_confinement(I, x, y)
         mode_results = self._calculate_mode_parameters(I)
@@ -225,25 +229,35 @@ class NearFieldAnalyzer:
 
     def _calculate_mode_parameters(self, I: np.ndarray) -> Dict:
         """
-        Calculate mode area (A_eff) and simple effective parameters
+        Calculate effective mode area A_eff using the standard definition:
+        A_eff = (∬ I dA)^2 / ∬ I^2 dA, with x,y in µm and I = |E|^2.
         """
         print("\n📐 Mode parameters:")
-        total_power = float(np.sum(I))
-        max_intensity = float(np.max(I))
-        mode_area = total_power / max_intensity if max_intensity > 0 else np.nan
+        x = getattr(self, "_last_x_um", None)
+        y = getattr(self, "_last_y_um", None)
+        if x is None or y is None:
+            dx = dy = 1.0
+        else:
+            dx = float(np.median(np.diff(x))) if np.size(x) > 1 else 1.0
+            dy = float(np.median(np.diff(y))) if np.size(y) > 1 else 1.0
+        dA = dx * dy
+
+        num = (np.sum(I) * dA) ** 2
+        den = np.sum(I**2) * dA
+        A_eff = float(num / max(den, 1e-30))
 
         wavelength_um = self.wavelength_um
-        mode_area_lambda2 = mode_area / (wavelength_um**2)
+        mode_area_lambda2 = A_eff / (wavelength_um**2) if wavelength_um > 0 else np.nan
 
-        # Simple placeholder
         n_eff = 2.4
 
-        print(f"  - Mode area: {mode_area:.3f} µm²")
-        print(f"  - Mode area (λ²): {mode_area_lambda2:.3f}")
+        print(f"  - dx, dy: {dx:.4f} µm, {dy:.4f} µm (dA={dA:.4f} µm²)")
+        print(f"  - A_eff: {A_eff:.3f} µm²")
+        print(f"  - A_eff (λ²): {mode_area_lambda2:.3f}")
         print(f"  - Effective index (rough): {n_eff:.2f}")
 
         return {
-            "mode_area_um2": float(mode_area),
+            "mode_area_um2": float(A_eff),
             "mode_area_lambda2": float(mode_area_lambda2),
             "effective_index": float(n_eff),
         }
