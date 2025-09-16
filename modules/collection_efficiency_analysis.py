@@ -195,7 +195,7 @@ class CollectionEfficiencyAnalyzer:
             
             if field_component is not None:
                 # Get all available coordinates
-                for coord_name in ['x', 'y', 'z', 'kx', 'ky', 'kz', 'theta', 'phi']:
+                for coord_name in ['x', 'y', 'z', 'kx', 'ky', 'kz', 'ux', 'uy', 'uz', 'theta', 'phi']:
                     if coord_name in field_component.coords:
                         coord_data = field_component.coords[coord_name]
                         coords[coord_name] = coord_data.values if hasattr(coord_data, 'values') else coord_data
@@ -299,12 +299,20 @@ class CollectionEfficiencyAnalyzer:
         results = {}
         
         try:
+            # Try both kx/ky and ux/uy coordinate systems
             kx = coords.get('kx')
             ky = coords.get('ky')
+            ux = coords.get('ux')
+            uy = coords.get('uy')
             
             if kx is None or ky is None:
-                print("  - No k-space coordinates available")
-                return results
+                if ux is None or uy is None:
+                    print("  - No k-space coordinates available")
+                    return results
+                else:
+                    # Use normalized k-space coordinates (ux, uy)
+                    kx = ux
+                    ky = uy
             
             # Calculate total power
             total_power = np.sum(I)

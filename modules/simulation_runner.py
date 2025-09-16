@@ -45,7 +45,17 @@ class SimulationRunner:
         region = os.environ.get("TIDY3D_REGION")
         try:
             if api_key:
-                web.configure(api_key=api_key, region=region)
+                # Try the newer API first, then fall back to older API
+                try:
+                    web.configure(api_key=api_key, region=region)
+                except TypeError:
+                    # Newer Tidy3D versions might not accept api_key parameter
+                    try:
+                        web.configure(region=region)
+                        # Set API key via environment or other method
+                        os.environ["TIDY3D_API_KEY"] = api_key
+                    except Exception:
+                        pass
             else:
                 # If already authenticated, this is a no-op; otherwise prompts in interactive sessions
                 try:

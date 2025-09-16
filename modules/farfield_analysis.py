@@ -18,6 +18,7 @@ from scipy.signal import hilbert
 from scipy.interpolate import griddata
 from scipy.ndimage import gaussian_filter
 from typing import Dict, Tuple, Optional
+from matplotlib.ticker import PercentFormatter
 try:
     from .plot_style import apply_theme, PALETTE, mono_cmap, bipolar_cmap
 except ImportError:
@@ -299,62 +300,130 @@ class FarFieldAnalyzer:
     
     def _calculate_beam_width(self, I: np.ndarray, theta: np.ndarray, phi: np.ndarray) -> float:
         """
-        Calculate beam width (FWHM) from angular radiation pattern
+        Calculate beam width (FWHM) from angular radiation pattern.
+        
+        This method properly handles 2D angular patterns by:
+        1. Finding the peak location in the 2D pattern
+        2. Extracting profiles through the peak in both theta and phi directions
+        3. Calculating FWHM for both directions and returning the average
         """
         try:
-            # Find maximum intensity
-            max_idx = np.unravel_index(np.argmax(I), I.shape)
-            
-            # Extract profile through maximum
-            if len(I.shape) == 2:
-                # 2D pattern
-                # Choose the longer axis for better resolution
-                if I.shape[1] >= I.shape[0]:
-                    profile = I[max_idx[0], :]
-                    angles = theta if theta.ndim == 1 else theta[:, 0]
-                else:
-                    profile = I[:, max_idx[1]]
-                    angles = phi if phi.ndim == 1 else phi[0, :]
-            else:
-                # 1D pattern
+            if len(I.shape) != 2:
+                # 1D pattern - use simple FWHM calculation
                 profile = I
                 angles = theta if (np.size(theta) >= np.size(phi)) else phi
+                return self._calculate_1d_fwhm(profile, angles)
             
-            # Find FWHM
-            max_val = np.max(profile)
-            half_max = max_val / 2
+            # 2D pattern - I.shape is (theta_size, phi_size)
+            theta_size, phi_size = I.shape
             
-            # Crossings where profile drops below half maximum
-            above = profile >= half_max
-            if not np.any(above):
+            # Find peak location
+            max_idx = np.unravel_index(np.argmax(I), I.shape)
+            theta_peak_idx, phi_peak_idx = max_idx
+            
+            # Extract profiles through the peak
+            theta_profile = I[:, phi_peak_idx]  # Profile along theta at peak phi
+            phi_profile = I[theta_peak_idx, :]  # Profile along phi at peak theta
+            
+            # Get coordinate arrays
+            if theta.ndim == 1:
+                theta_coords = theta
+            else:
+                theta_coords = theta[:, phi_peak_idx] if theta.shape[1] > phi_peak_idx else theta[:, 0]
+            
+            if phi.ndim == 1:
+                phi_coords = phi
+            else:
+                phi_coords = phi[theta_peak_idx, :] if phi.shape[0] > theta_peak_idx else phi[0, :]
+            
+            # Calculate FWHM for both directions
+            theta_fwhm = self._calculate_1d_fwhm(theta_profile, theta_coords)
+            phi_fwhm = self._calculate_1d_fwhm(phi_profile, phi_coords)
+            
+            # Return the average of both directions (geometric mean for angular quantities)
+            if np.isnan(theta_fwhm) and np.isnan(phi_fwhm):
                 return float('nan')
-            idx = np.where(above)[0]
-            i_lo, i_hi = int(idx[0]), int(idx[-1])
-            # Guard bounds
-            n = len(profile)
-            if i_lo <= 0 or i_hi >= n - 1:
-                # Peak too close to boundary; cannot determine FWHM reliably
-                return float('nan')
-            # Linear interpolate to half max on both sides
-            def interp_x(i0, i1):
-                x0, x1 = float(angles[i0]), float(angles[i1])
-                y0, y1 = float(profile[i0]), float(profile[i1])
-                if y1 == y0:
-                    return x0
-                t = (half_max - y0) / (y1 - y0)
-                t = np.clip(t, 0.0, 1.0)
-                return x0 + t * (x1 - x0)
-            # Left crossing
-            x_lo = interp_x(i_lo - 1, i_lo)
-            # Right crossing
-            x_hi = interp_x(i_hi, min(i_hi + 1, n - 1))
-            width = float(x_hi - x_lo)
-            return width
+            elif np.isnan(theta_fwhm):
+                return phi_fwhm
+            elif np.isnan(phi_fwhm):
+                return theta_fwhm
+            else:
+                # Use geometric mean for angular quantities
+                return float(np.sqrt(theta_fwhm * phi_fwhm))
             
         except Exception as e:
             print(f"  - Warning: Could not calculate beam width: {e}")
         
         return float('nan')
+    
+    def _calculate_1d_fwhm(self, profile: np.ndarray, angles: np.ndarray) -> float:
+        """
+        Calculate FWHM for a 1D profile with robust error handling.
+        """
+        try:
+            if len(profile) != len(angles):
+                return float('nan')
+            
+            # Find maximum
+            max_val = np.max(profile)
+            if max_val <= 0:
+                return float('nan')
+            
+            # Try FWHM first, then fall back to 1/e width
+            for threshold_ratio in [0.5, 1.0/np.e]:
+                half_max = max_val * threshold_ratio
+                
+                # Find crossings
+                above = profile >= half_max
+                if not np.any(above):
+                    continue
+                
+                idx = np.where(above)[0]
+                if len(idx) < 2:
+                    continue
+                
+                i_lo, i_hi = int(idx[0]), int(idx[-1])
+                
+                # Check bounds
+                n = len(profile)
+                if i_lo <= 0 or i_hi >= n - 1:
+                    # Try to use available data
+                    if i_lo <= 0:
+                        i_lo = 0
+                    if i_hi >= n - 1:
+                        i_hi = n - 1
+                    if i_hi - i_lo < 2:
+                        continue
+                
+                # Linear interpolation to find exact crossings
+                def interp_crossing(i0, i1):
+                    if i0 < 0 or i1 >= n:
+                        return float(angles[min(max(i0, 0), n-1)])
+                    x0, x1 = float(angles[i0]), float(angles[i1])
+                    y0, y1 = float(profile[i0]), float(profile[i1])
+                    if abs(y1 - y0) < 1e-12:
+                        return x0
+                    t = (half_max - y0) / (y1 - y0)
+                    t = np.clip(t, 0.0, 1.0)
+                    return x0 + t * (x1 - x0)
+                
+                # Calculate crossings
+                x_lo = interp_crossing(i_lo - 1, i_lo)
+                x_hi = interp_crossing(i_hi, i_hi + 1)
+                
+                width = float(x_hi - x_lo)
+                
+                # Convert to degrees if needed (assuming radians if < 0.1)
+                if width > 0 and width < 0.1:
+                    width = np.degrees(width)
+                
+                return width
+            
+            # If all methods fail, return nan
+            return float('nan')
+            
+        except Exception as e:
+            return float('nan')
     
     def _calculate_collection_efficiency(self, results: Dict) -> Dict:
         """
@@ -655,19 +724,55 @@ class FarFieldAnalyzer:
             collection_efficiencies.append(collection_efficiency)
         
         apply_theme()
+        # Figure
         fig, ax = plt.subplots()
-        eff_percent = np.array(collection_efficiencies) * 100
-        ax.plot(na_values, eff_percent, marker='o', linewidth=2.5, markersize=6, color=PALETTE[0])
-        current_na = self.NA
-        current_eff = np.interp(current_na, na_values, collection_efficiencies) * 100
-        ax.axvline(current_na, linestyle='--', color=PALETTE[1], alpha=1, linewidth=1, zorder=-1)
-        ax.axhline(current_eff, linestyle='--', color=PALETTE[2], alpha=1, linewidth=1, zorder=-1)
-        ax.set_xlabel('Numerical Aperture (NA)')
-        ax.set_ylabel('Collection Efficiency (%)')
-        ax.set_title('Collection Efficiency vs Numerical Aperture')
-        ax.grid(False)
+
+        # Data
+        eff_percent = np.array(collection_efficiencies, dtype=float) * 100.0
+
+        # Main curve — slimmer line, hollow markers
+        ax.plot(
+            na_values, eff_percent,
+            lw=2.0, marker='o', ms=4.5,
+            mfc=PALETTE[1], mec=PALETTE[1], mew=1.0,
+            color=PALETTE[1], alpha=1,
+            markevery=max(1, len(na_values)//16)  # fewer visible markers on dense grids
+        )
+
+        # Subtle grid + de-emphasized spines
+        ax.grid(axis='both', linestyle=':', lw=0.8, alpha=0.6)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+
+        # Axes, ticks, headroom
+        ax.set_xlim(0, 1.05)
+        y_top = max(60, np.ceil(eff_percent.max()/5)*5 + 5)  # nice headroom
+        ax.set_ylim(0, y_top)
+        ax.set_xlabel('Numerical aperture (NA)', fontsize=11)
+        ax.set_ylabel('Collection efficiency', fontsize=11)
+        ax.yaxis.set_major_formatter(PercentFormatter(decimals=0))
+
+        # Reference lines (muted) + labels
+        current_na = float(self.NA)
+        current_eff = float(np.interp(current_na, na_values, collection_efficiencies) * 100.0)
+
+        ax.axvline(current_na, ls='--', lw=1.0, color=PALETTE[2], alpha=0.8, zorder=-1)
+        ax.axhline(current_eff, ls='--', lw=1.0, color=PALETTE[2], alpha=0.8, zorder=-1)
+
+        ax.annotate(f'NA = {current_na:g}', xy=(current_na, 0),
+                    xytext=(6, 6), textcoords='offset points',
+                    ha='left', va='bottom', fontsize=9, color=PALETTE[2])
+
+        ax.annotate(f'{current_eff:.0f}%', xy=(0, current_eff),
+                    xytext=(6, -6), textcoords='offset points',
+                    ha='left', va='top', fontsize=9, color=PALETTE[2])
+
+        # Title
+        ax.set_title('Collection efficiency vs NA', fontsize=12, weight='bold', pad=6)
+
+        # Save/show
         plt.tight_layout()
-        plt.savefig('collection_efficiency_vs_na.png', dpi=300, bbox_inches='tight')
+        plt.savefig('collection_efficiency_vs_na.png', dpi=300)
         plt.show()
         
         print("✓ Collection efficiency vs NA plot saved to 'collection_efficiency_vs_na.png'")

@@ -299,7 +299,7 @@ def run_scout_stage(config: WorkflowConfig) -> Dict[str, Any]:
     }
     save_json(summary, stage.summary_path)
 
-    print(f"✓ Resonance located at {resonance_wavelength_um:.6f} µm (f₀ = {freq_hz / 1e12:.6f} THz)")
+    print(f"✓ Resonance located at {resonance_wavelength_um:.6f} µm (f0 = {freq_hz / 1e12:.6f} THz)")
     print(f"✓ Estimated quality factor Q = {q_factor:,.0f}")
     if tau_ps is not None:
         print(f"✓ Decay time τ ≈ {tau_ps:.3f} ps")
@@ -508,7 +508,7 @@ def run_workflow(config: WorkflowConfig) -> Dict[str, Any]:
     if "scout" in results:
         scout = results["scout"]["summary"]
         print(
-            f"Scout: λ₀ = {scout['resonance_wavelength_um']:.6f} µm, "
+            f"Scout: λ0 = {scout['resonance_wavelength_um']:.6f} µm, "
             f"Q = {scout['q_factor']:,.0f}"
         )
     if "lockin" in results:
@@ -521,7 +521,7 @@ def run_workflow(config: WorkflowConfig) -> Dict[str, Any]:
         ce_str = f"{ce*100:.1f}%" if ce is not None else "n/a"
         lock_lambda = lock.get("lockin_wavelength_um")
         lambda_str = f"{lock_lambda:.6f} µm" if lock_lambda is not None else "n/a"
-        print(f"Lock-in: λ = {lambda_str}, Vₑff = {mv_str}, Fp = {purcell_str}, η = {ce_str}")
+        print(f"Lock-in: λ = {lambda_str}, Veff = {mv_str}, Fp = {purcell_str}, η = {ce_str}")
 
     print("\n🏁 WORKFLOW COMPLETE")
     return results
@@ -547,7 +547,7 @@ def run_complete_analysis(config: Optional[WorkflowConfig] = None) -> Dict[str, 
 def parse_args(argv: Optional[list] = None) -> argparse.Namespace:
     """Parse command-line arguments."""
 
-    thickness_um = 0.16 # default thickness
+    thickness_um = 0.19 # default thickness
 
     parser = argparse.ArgumentParser(
         description="Run the two-pass photonic cavity analysis workflow.",
@@ -575,8 +575,8 @@ def parse_args(argv: Optional[list] = None) -> argparse.Namespace:
     parser.add_argument("--n-bg", type=float, default=1.0, help="Background refractive index.")
     parser.add_argument("--scout-run-time-ps", type=float, default=12.0, help="Scout simulation run time (ps).")
     parser.add_argument("--lockin-run-time-ps", type=float, default=8.0, help="Lock-in simulation run time (ps).")
-    parser.add_argument("--scout-bandwidth", type=float, default=0.12, help="Relative bandwidth Δf/f₀ for the scout source.")
-    parser.add_argument("--lockin-bandwidth", type=float, default=0.02, help="Relative bandwidth Δf/f₀ for the lock-in source.")
+    parser.add_argument("--scout-bandwidth", type=float, default=0.12, help="Relative bandwidth Δf/f0 for the scout source.")
+    parser.add_argument("--lockin-bandwidth", type=float, default=0.02, help="Relative bandwidth Δf/f0 for the lock-in source.")
     parser.add_argument("--scout-results", type=str, help="Path to scout simulation results (HDF5).")
     parser.add_argument("--lockin-results", type=str, help="Path to lock-in simulation results (HDF5).")
     parser.add_argument("--scout-sim", type=str, help="Output path for the scout simulation JSON file.")
