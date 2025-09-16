@@ -672,7 +672,12 @@ class FarFieldAnalyzer:
             axes[i].set_visible(False)
         
         plt.tight_layout()
-        plt.savefig('figures/farfield_analysis.png', dpi=300, bbox_inches='tight')
+        from pathlib import Path as _Path
+        _repo_root = _Path(__file__).resolve().parents[1]
+        _fig_dir = _repo_root / 'figures'
+        _fig_dir.mkdir(parents=True, exist_ok=True)
+        _out_png = _fig_dir / 'farfield_analysis.png'
+        plt.savefig(str(_out_png), dpi=300, bbox_inches='tight')
         plt.show()
         
         # Create separate collection efficiency vs NA plot
@@ -772,10 +777,15 @@ class FarFieldAnalyzer:
 
         # Save/show
         plt.tight_layout()
-        plt.savefig('figures/collection_efficiency_vs_na.png', dpi=300)
+        from pathlib import Path as _Path
+        _repo_root = _Path(__file__).resolve().parents[1]
+        _fig_dir = _repo_root / 'figures'
+        _fig_dir.mkdir(parents=True, exist_ok=True)
+        _out_png = _fig_dir / 'collection_efficiency_vs_na.png'
+        plt.savefig(str(_out_png), dpi=300)
         plt.show()
         
-        print("✓ Collection efficiency vs NA plot saved to 'collection_efficiency_vs_na.png'")
+        print(f"✓ Collection efficiency vs NA plot saved to '{_out_png}'")
     
     def _plot_collection_efficiency_vs_na(self, angular_monitor, ax):
         """
@@ -814,11 +824,14 @@ class FarFieldAnalyzer:
                     'radiation_metrics': monitor_results.get('radiation_metrics', {})
                 }
         
-        filename = 'data/summaries/farfield_analysis_results.json'
-        with open(filename, 'w') as f:
+        from pathlib import Path as _Path
+        _repo_root = _Path(__file__).resolve().parents[1]
+        _out_json = _repo_root / 'data' / 'summaries' / 'farfield_analysis_results.json'
+        _out_json.parent.mkdir(parents=True, exist_ok=True)
+        with open(_out_json, 'w') as f:
             json.dump(json_results, f, indent=2)
         
-        print(f"✓ Far-field analysis results saved to {filename}")
+        print(f"✓ Far-field analysis results saved to {_out_json}")
 
 
 def analyze_farfield(data_path: str,

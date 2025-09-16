@@ -13,7 +13,12 @@ import argparse
 from pathlib import Path
 
 import sys
-sys.path.append("modules")
+from pathlib import Path as _Path
+
+# Ensure repository root on path
+_REPO_ROOT = _Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 from modules.simulation_setup import SimulationSetup  # noqa: E402
 
@@ -51,7 +56,13 @@ def main() -> None:
         sim = setup.create_simulation(run_time_ps=args.run_time_ps)
         default_name = f"simulation_lockin_full_{args.thickness_um:.2f}um.json"
 
-    save_path = Path(args.save_json) if args.save_json else Path(default_name)
+    # Default to repo-root/data/simulations; anchor relative overrides
+    if args.save_json:
+        save_path = Path(args.save_json)
+        if not save_path.is_absolute():
+            save_path = _REPO_ROOT / save_path
+    else:
+        save_path = _REPO_ROOT / 'data' / 'simulations' / default_name
     setup.save_simulation(sim, str(save_path))
 
     # Render and save the visualization figure
@@ -60,5 +71,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
 

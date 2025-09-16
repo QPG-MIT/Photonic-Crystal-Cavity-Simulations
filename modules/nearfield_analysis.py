@@ -509,9 +509,14 @@ class NearFieldAnalyzer:
         self._add_structure_outline_nearfield(axes[2], x, y, color="darkgrey")
 
         plt.tight_layout()
-        plt.savefig("figures/nearfield_analysis.png", dpi=300, bbox_inches="tight")
+        from pathlib import Path as _Path
+        _repo_root = _Path(__file__).resolve().parents[1]
+        _fig_dir = _repo_root / 'figures'
+        _fig_dir.mkdir(parents=True, exist_ok=True)
+        _out_png = _fig_dir / 'nearfield_analysis.png'
+        plt.savefig(str(_out_png), dpi=300, bbox_inches="tight")
         plt.show()
-        print("✓ Near-field analysis plots saved to 'figures/nearfield_analysis.png'")
+        print(f"✓ Near-field analysis plots saved to '{_out_png}'")
 
     def _create_individual_field_plot(self, I: np.ndarray, x: np.ndarray, y: np.ndarray):
         """Create an individual plot for the field intensity with structure outline."""
@@ -549,9 +554,14 @@ class NearFieldAnalyzer:
         )
 
         plt.tight_layout()
-        plt.savefig("figures/nearfield_intensity_individual.png", dpi=300, bbox_inches="tight")
+        from pathlib import Path as _Path
+        _repo_root = _Path(__file__).resolve().parents[1]
+        _fig_dir = _repo_root / 'figures'
+        _fig_dir.mkdir(parents=True, exist_ok=True)
+        _out_png = _fig_dir / 'nearfield_intensity_individual.png'
+        plt.savefig(str(_out_png), dpi=300, bbox_inches="tight")
         plt.show()
-        print("✓ Individual field intensity plot saved to 'figures/nearfield_intensity_individual.png'")
+        print(f"✓ Individual field intensity plot saved to '{_out_png}'")
 
     # ------------------------------ Overlays ------------------------------
 
@@ -579,8 +589,18 @@ class NearFieldAnalyzer:
 
         eps = np.full((Ny, Nx), n_clad**2, dtype=float)
 
+        # Resolve GDS paths relative to repo root so CWD doesn't matter
+        from pathlib import Path as _Path
+        _repo_root = _Path(__file__).resolve().parents[1]
+        cav_path = _Path(cavity_gds)
+        if not cav_path.is_absolute():
+            cav_path = (_repo_root / cav_path).resolve()
+        hol_path = _Path(holes_gds)
+        if not hol_path.is_absolute():
+            hol_path = (_repo_root / hol_path).resolve()
+
         # Cavity polygons
-        cav = gdstk.read_gds(str(cavity_gds))
+        cav = gdstk.read_gds(str(cav_path))
         top = cav.top_level()[0]
         scale = cav.unit / 1e-6  # -> µm
         polys_cav = []
@@ -595,8 +615,8 @@ class NearFieldAnalyzer:
         in_core = in_core.reshape(Ny, Nx)
 
         # Subtract holes if present
-        if Path(holes_gds).exists():
-            hol = gdstk.read_gds(str(holes_gds))
+        if hol_path.exists():
+            hol = gdstk.read_gds(str(hol_path))
             top_h = hol.top_level()[0]
             scale_h = hol.unit / 1e-6
             in_holes = np.zeros((Ny, Nx), dtype=bool)
@@ -720,10 +740,14 @@ class NearFieldAnalyzer:
             else:
                 json_results[key] = self._to_json(value)
 
-        filename = "data/summaries/nearfield_analysis_results.json"
-        with open(filename, "w") as f:
+        # Save JSON to repo-root/data/summaries
+        from pathlib import Path as _Path
+        _repo_root = _Path(__file__).resolve().parents[1]
+        _out_json = _repo_root / 'data' / 'summaries' / 'nearfield_analysis_results.json'
+        _out_json.parent.mkdir(parents=True, exist_ok=True)
+        with open(_out_json, "w") as f:
             json.dump(json_results, f, indent=2)
-        print(f"✓ Near-field analysis results saved to {filename}")
+        print(f"✓ Near-field analysis results saved to {_out_json}")
 
     @staticmethod
     def _to_json(obj):

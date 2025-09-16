@@ -76,6 +76,12 @@ class ModeVolumeAnalyzer:
         """
         self.cavity_gds = Path(cavity_gds)
         self.holes_gds = Path(holes_gds)
+        # Resolve relative paths to repo root so notebooks/scripts work consistently
+        repo_root = Path(__file__).resolve().parents[1]
+        if not self.cavity_gds.is_absolute():
+            self.cavity_gds = (repo_root / self.cavity_gds).resolve()
+        if not self.holes_gds.is_absolute():
+            self.holes_gds = (repo_root / self.holes_gds).resolve()
         self.thickness_um = thickness_um
         self.wavelength_um = wavelength_um
         self.hole_layer = hole_layer
@@ -145,8 +151,13 @@ class ModeVolumeAnalyzer:
         """
         print("\n🔧 Creating permittivity map from GDS geometry...")
         
-        # Load cavity GDS to get core boundaries
-        lib_cavity = gdstk.read_gds(str(self.cavity_gds))
+        # Load cavity GDS to get core boundaries (robust handling)
+        if not Path(self.cavity_gds).exists():
+            raise RuntimeError(f"Cavity GDS not found: {self.cavity_gds}")
+        try:
+            lib_cavity = gdstk.read_gds(str(self.cavity_gds))
+        except Exception as exc:
+            raise RuntimeError(f"Failed to read cavity GDS '{self.cavity_gds}': {exc}")
         gds_scale_cavity = lib_cavity.unit / 1e-6  # µm / user-unit
         tops_cavity = lib_cavity.top_level()
         if not tops_cavity:
@@ -167,20 +178,25 @@ class ModeVolumeAnalyzer:
         print(f"  - Cavity bounds: x[{xmin_um:.3f}, {xmax_um:.3f}] µm, "
               f"y[{ymin_um:.3f}, {ymax_um:.3f}] µm")
         
-        # Load holes GDS
-        lib_holes = gdstk.read_gds(str(self.holes_gds))
-        gds_scale_holes = lib_holes.unit / 1e-6  # µm / user-unit
-        tops_holes = lib_holes.top_level()
-        if not tops_holes:
-            raise RuntimeError("No top-level cells found in holes GDS")
-        hole_cell = tops_holes[0]
-        
-        # Collect hole polygons
+        # Load holes GDS (optional; proceed without if missing/unreadable)
         hole_paths = []
-        for poly in getattr(hole_cell, "polygons", []):
-            if (poly.layer, poly.datatype) == (self.hole_layer, self.hole_dtype):
-                verts_um = np.array(poly.points, float) * gds_scale_holes  # µm
-                hole_paths.append(MPLPath(verts_um))  # Keep in micrometers
+        if Path(self.holes_gds).exists():
+            try:
+                lib_holes = gdstk.read_gds(str(self.holes_gds))
+                gds_scale_holes = lib_holes.unit / 1e-6  # µm / user-unit
+                tops_holes = lib_holes.top_level()
+                if tops_holes:
+                    hole_cell = tops_holes[0]
+                    for poly in getattr(hole_cell, "polygons", []):
+                        if (poly.layer, poly.datatype) == (self.hole_layer, self.hole_dtype):
+                            verts_um = np.array(poly.points, float) * gds_scale_holes  # µm
+                            hole_paths.append(MPLPath(verts_um))  # Keep in micrometers
+                else:
+                    print("Warning: No top-level cells found in holes GDS; proceeding without holes")
+            except Exception as exc:
+                print(f"Warning: Failed to read holes GDS '{self.holes_gds}': {exc}. Proceeding without holes.")
+        else:
+            print(f"Warning: Holes GDS not found at '{self.holes_gds}'. Proceeding without holes.")
         
         print(f"  - Found {len(hole_paths)} hole polygons")
         
@@ -428,9 +444,15 @@ class ModeVolumeAnalyzer:
         
         
         plt.tight_layout()
-        plt.savefig(save_file, dpi=150, bbox_inches='tight')
+        from pathlib import Path as _Path
+        _path = _Path(save_file)
+        if not _path.is_absolute():
+            _repo_root = _Path(__file__).resolve().parents[1]
+            _path = _repo_root / _path
+        _path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(str(_path), dpi=150, bbox_inches='tight')
         plt.show()
-        print(f"✓ Field distribution plots saved to {save_file}")
+        print(f"✓ Field distribution plots saved to {_path}")
     
     def _add_structure_outline_xy(self, ax, eps_slice, x, y):
         """Add structure outline to XY plane using permittivity slice."""
@@ -502,16 +524,21 @@ class ModeVolumeAnalyzer:
     def save_results(self, results: Dict, filename: str = "data/summaries/mode_volume_results.json") -> None:
         """Save analysis results to file."""
         import json
-        
-        with open(filename, 'w') as f:
+        from pathlib import Path as _Path
+        _path = _Path(filename)
+        if not _path.is_absolute():
+            _repo_root = _Path(__file__).resolve().parents[1]
+            _path = _repo_root / _path
+        _path.parent.mkdir(parents=True, exist_ok=True)
+        with open(_path, 'w') as f:
             json.dump(results, f, indent=2)
         
-        print(f"✓ Mode volume analysis results saved to {filename}")
+        print(f"✓ Mode volume analysis results saved to {_path}")
 
 
 def analyze_mode_volume(data_path: str,
-                       cavity_gds: str = "Cavity.gds",
-                       holes_gds: str = "Holes.gds",
+                       cavity_gds: str = "gds/Cavity.gds",
+                       holes_gds: str = "gds/Holes.gds",
                        thickness_um: float = 0.14,
                        wavelength_um: float = 0.62,
                        monitor_name: str = "fld_3d_box",

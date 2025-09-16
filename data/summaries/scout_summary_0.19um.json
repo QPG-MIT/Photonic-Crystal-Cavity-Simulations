@@ -1,7 +1,7 @@
 {
   "stage": "scout",
-  "simulation_file": "simulation_scout_q_only_0.19um.json",
-  "results_file": "results_scout_q_only_0.19um.hdf5",
+  "simulation_file": "/Users/sandrobuzzi/Documents/MIT/QPAIG/Projects/Silicon Hard Mask/Simulations/data/simulations/simulation_scout_q_only_0.19um.json",
+  "results_file": "/Users/sandrobuzzi/Documents/MIT/QPAIG/Projects/Silicon Hard Mask/Simulations/data/results/results_scout_q_only_0.19um.hdf5",
   "run_time_ps": 12.0,
   "bandwidth_rel": 0.12,
   "resonance_frequency_thz": 458.3549163052564,

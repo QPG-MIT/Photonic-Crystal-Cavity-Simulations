@@ -620,9 +620,15 @@ class QFactorAnalyzer:
 
         plt.legend(frameon=False, fontsize=10, loc='lower right')
         plt.tight_layout()
-        plt.savefig('q_factor_analysis.png', dpi=150, bbox_inches='tight')
+        # Save under repo-root figures directory
+        from pathlib import Path as _Path
+        _repo_root = _Path(__file__).resolve().parents[1]
+        _fig_dir = _repo_root / 'figures'
+        _fig_dir.mkdir(parents=True, exist_ok=True)
+        _out_png = _fig_dir / 'q_factor_analysis.png'
+        plt.savefig(str(_out_png), dpi=150, bbox_inches='tight')
         plt.show()
-        print("✓ Ringdown analysis plot saved to q_factor_analysis.png")
+        print(f"✓ Ringdown analysis plot saved to {_out_png}")
     
     def save_results(self, results: Dict, filename: str = "q_factor_results.json") -> None:
         """Save analysis results to file."""
@@ -658,10 +664,21 @@ class QFactorAnalyzer:
         # Convert results to JSON-serializable format
         json_results = convert_for_json(results)
         
-        with open(filename, 'w') as f:
+        from pathlib import Path as _Path
+        _path = _Path(filename)
+        if not _path.is_absolute():
+            # If relative, anchor to repo root summaries directory
+            _repo_root = _Path(__file__).resolve().parents[1]
+            # If only a bare filename is provided, place under data/summaries
+            if len(_path.parts) == 1:
+                _path = _repo_root / 'data' / 'summaries' / _path.name
+            else:
+                _path = _repo_root / _path
+        _path.parent.mkdir(parents=True, exist_ok=True)
+        with open(_path, 'w') as f:
             json.dump(json_results, f, indent=2)
         
-        print(f"✓ Q-factor analysis results saved to {filename}")
+        print(f"✓ Q-factor analysis results saved to {_path}")
 
 
 def analyze_q_factor(data_path: str,

@@ -27,8 +27,10 @@ import numpy as np
 
 warnings.filterwarnings("ignore")
 
-# Ensure the repository modules are importable
-sys.path.append("modules")
+# Ensure repository root is on sys.path so we can import the top-level `modules` package
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from modules.simulation_setup import SimulationSetup  # noqa: E402
 from modules.simulation_runner import SimulationRunner  # noqa: E402
@@ -140,18 +142,18 @@ def build_default_workflow_config(
         name="scout",
         run_time_ps=12.0,
         bandwidth_rel=0.12,
-        simulation_path=Path(f"data/simulations/simulation_scout_q_only_{tag}um.json"),
-        results_path=Path(f"data/results/results_scout_q_only_{tag}um.hdf5"),
-        summary_path=Path(f"data/summaries/scout_summary_{tag}um.json"),
+        simulation_path=(REPO_ROOT / f"data/simulations/simulation_scout_q_only_{tag}um.json"),
+        results_path=(REPO_ROOT / f"data/results/results_scout_q_only_{tag}um.hdf5"),
+        summary_path=(REPO_ROOT / f"data/summaries/scout_summary_{tag}um.json"),
         task_name=f"photonic_cavity_scout_{tag}um",
     )
     lockin = StageOptions(
         name="lockin",
         run_time_ps=8.0,
         bandwidth_rel=0.02,
-        simulation_path=Path(f"data/simulations/simulation_lockin_full_{tag}um.json"),
-        results_path=Path(f"data/results/results_lockin_full_{tag}um.hdf5"),
-        summary_path=Path(f"data/summaries/lockin_summary_{tag}um.json"),
+        simulation_path=(REPO_ROOT / f"data/simulations/simulation_lockin_full_{tag}um.json"),
+        results_path=(REPO_ROOT / f"data/results/results_lockin_full_{tag}um.hdf5"),
+        summary_path=(REPO_ROOT / f"data/summaries/lockin_summary_{tag}um.json"),
         task_name=f"photonic_cavity_lockin_{tag}um",
     )
     return WorkflowConfig(
@@ -180,18 +182,24 @@ def config_from_args(args: argparse.Namespace) -> WorkflowConfig:
     config.scout.bandwidth_rel = args.scout_bandwidth
     config.lockin.bandwidth_rel = args.lockin_bandwidth
 
+    def _resolve_to_repo_root(p: Optional[str]) -> Optional[Path]:
+        if not p:
+            return None
+        pp = Path(p)
+        return pp if pp.is_absolute() else (REPO_ROOT / pp)
+
     if args.scout_results:
-        config.scout.results_path = Path(args.scout_results)
+        config.scout.results_path = _resolve_to_repo_root(args.scout_results)
     if args.lockin_results:
-        config.lockin.results_path = Path(args.lockin_results)
+        config.lockin.results_path = _resolve_to_repo_root(args.lockin_results)
     if args.scout_sim:
-        config.scout.simulation_path = Path(args.scout_sim)
+        config.scout.simulation_path = _resolve_to_repo_root(args.scout_sim)
     if args.lockin_sim:
-        config.lockin.simulation_path = Path(args.lockin_sim)
+        config.lockin.simulation_path = _resolve_to_repo_root(args.lockin_sim)
     if args.scout_summary:
-        config.scout.summary_path = Path(args.scout_summary)
+        config.scout.summary_path = _resolve_to_repo_root(args.scout_summary)
     if args.lockin_summary:
-        config.lockin.summary_path = Path(args.lockin_summary)
+        config.lockin.summary_path = _resolve_to_repo_root(args.lockin_summary)
 
     # Simulation execution flags
     # Default: run simulations unless explicitly disabled via CLI
@@ -407,6 +415,7 @@ def run_lockin_stage(config: WorkflowConfig, resonance_summary: Dict[str, Any]) 
             n_bg=config.n_bg,
             save_results=True,
             create_plots=True,
+            save_prefix="polarization",
         )
         results["polarization"] = pol_results
         summary["dolp"] = extract_float(pol_results.DoLP_avg)
@@ -571,7 +580,7 @@ def parse_args(argv: Optional[list] = None) -> argparse.Namespace:
         default=None,
         help="Override the lock-in wavelength (µm) when running the lock-in stage only.",
     )
-    parser.add_argument("--na", type=float, default=0.9, help="Collection numerical aperture for far-field analyses.")
+    parser.add_argument("--na", type=float, default=0.6, help="Collection numerical aperture for far-field analyses.")
     parser.add_argument("--n-bg", type=float, default=1.0, help="Background refractive index.")
     parser.add_argument("--scout-run-time-ps", type=float, default=12.0, help="Scout simulation run time (ps).")
     parser.add_argument("--lockin-run-time-ps", type=float, default=8.0, help="Lock-in simulation run time (ps).")

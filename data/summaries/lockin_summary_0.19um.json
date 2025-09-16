@@ -1,7 +1,7 @@
 {
   "stage": "lockin",
-  "simulation_file": "simulation_lockin_full_0.19um.json",
-  "results_file": "results_lockin_full_0.19um.hdf5",
+  "simulation_file": "/Users/sandrobuzzi/Documents/MIT/QPAIG/Projects/Silicon Hard Mask/Simulations/data/simulations/simulation_lockin_full_0.19um.json",
+  "results_file": "/Users/sandrobuzzi/Documents/MIT/QPAIG/Projects/Silicon Hard Mask/Simulations/data/results/results_lockin_full_0.19um.hdf5",
   "run_time_ps": 8.0,
   "bandwidth_rel": 0.02,
   "lockin_wavelength_um": 0.6540618357856632,

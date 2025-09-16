@@ -591,10 +591,16 @@ class CollectionEfficiencyAnalyzer:
                         f'{value:.3f}', ha='center', va='bottom')
         
         plt.tight_layout()
-        plt.savefig('collection_efficiency_analysis.png', dpi=300, bbox_inches='tight')
+        # Save figure under repo-root/figures
+        from pathlib import Path as _Path
+        _repo_root = _Path(__file__).resolve().parents[1]
+        _fig_dir = _repo_root / 'figures'
+        _fig_dir.mkdir(parents=True, exist_ok=True)
+        _out_png = _fig_dir / 'collection_efficiency_analysis.png'
+        plt.savefig(str(_out_png), dpi=300, bbox_inches='tight')
         plt.show()
         
-        print("✓ Collection efficiency plots saved to 'collection_efficiency_analysis.png'")
+        print(f"✓ Collection efficiency plots saved to '{_out_png}'")
     
     def _save_results(self, results: Dict):
         """
@@ -614,11 +620,16 @@ class CollectionEfficiencyAnalyzer:
                     if k != 'field_data'
                 }
         
+        # Save JSON under repo-root/data/summaries by default
+        from pathlib import Path as _Path
         filename = 'collection_efficiency_results.json'
-        with open(filename, 'w') as f:
+        _repo_root = _Path(__file__).resolve().parents[1]
+        _out_json = _repo_root / 'data' / 'summaries' / filename
+        _out_json.parent.mkdir(parents=True, exist_ok=True)
+        with open(_out_json, 'w') as f:
             json.dump(json_results, f, indent=2)
         
-        print(f"✓ Collection efficiency results saved to {filename}")
+        print(f"✓ Collection efficiency results saved to {_out_json}")
 
 
 def analyze_collection_efficiency(data_path: str,

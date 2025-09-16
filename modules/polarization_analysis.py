@@ -373,10 +373,14 @@ class PolarizationAnalyzer:
         axs[2].contour(phi_deg, theta_deg, res.NA_mask, levels=[0.5], colors="w")
         
         plt.tight_layout()
-        Path("figures").mkdir(parents=True, exist_ok=True)
-        plt.savefig(f"figures/{save_prefix}_heatmaps.png", dpi=160, bbox_inches="tight")
+        from pathlib import Path as _Path
+        _repo_root = _Path(__file__).resolve().parents[1]
+        _fig_dir = _repo_root / 'figures'
+        _fig_dir.mkdir(parents=True, exist_ok=True)
+        _out_png = _fig_dir / f"{save_prefix}_heatmaps.png"
+        plt.savefig(str(_out_png), dpi=160, bbox_inches="tight")
         plt.show()
-        print(f"✓ Theta-phi heatmaps saved to figures/{save_prefix}_heatmaps.png")
+        print(f"✓ Theta-phi heatmaps saved to {_out_png}")
     
     def plot_azimuthal_averages(self, res: FarfieldSummary, save_prefix: str = "polarization") -> None:
         """Plot azimuthal averages of polarization properties."""
@@ -411,9 +415,14 @@ class PolarizationAnalyzer:
         plt.legend(frameon=False)
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
-        plt.savefig(f"figures/{save_prefix}_azimuthal.png", dpi=160, bbox_inches="tight")
+        from pathlib import Path as _Path
+        _repo_root = _Path(__file__).resolve().parents[1]
+        _fig_dir = _repo_root / 'figures'
+        _fig_dir.mkdir(parents=True, exist_ok=True)
+        _out_png = _fig_dir / f"{save_prefix}_azimuthal.png"
+        plt.savefig(str(_out_png), dpi=160, bbox_inches="tight")
         plt.show()
-        print(f"✓ Azimuthal averages saved to figures/{save_prefix}_azimuthal.png")
+        print(f"✓ Azimuthal averages saved to {_out_png}")
     
     def plot_bfp_intensity(self, res: FarfieldSummary, save_prefix: str = "polarization", 
                           scatter: bool = True) -> None:
@@ -454,9 +463,14 @@ class PolarizationAnalyzer:
         if scatter:
             plt.colorbar(label="$S_0$ (norm.)")
         plt.tight_layout()
-        plt.savefig(f"figures/{save_prefix}_bfp.png", dpi=160, bbox_inches="tight")
+        from pathlib import Path as _Path
+        _repo_root = _Path(__file__).resolve().parents[1]
+        _fig_dir = _repo_root / 'figures'
+        _fig_dir.mkdir(parents=True, exist_ok=True)
+        _out_png = _fig_dir / f"{save_prefix}_bfp.png"
+        plt.savefig(str(_out_png), dpi=160, bbox_inches="tight")
         plt.show()
-        print(f"✓ Back focal plane plot saved to figures/{save_prefix}_bfp.png")
+        print(f"✓ Back focal plane plot saved to {_out_png}")
     
     def plot_bfp_polarization_quiver(self, res: FarfieldSummary, save_prefix: str = "polarization",
                                    step: int = 4, scale: float = 0.075) -> None:
@@ -490,9 +504,14 @@ class PolarizationAnalyzer:
         plt.xlabel("$u_x$")
         plt.ylabel("$u_y$")
         plt.tight_layout()
-        plt.savefig(f"figures/{save_prefix}_bfp_quiver.png", dpi=160, bbox_inches="tight")
+        from pathlib import Path as _Path
+        _repo_root = _Path(__file__).resolve().parents[1]
+        _fig_dir = _repo_root / 'figures'
+        _fig_dir.mkdir(parents=True, exist_ok=True)
+        _out_png = _fig_dir / f"{save_prefix}_bfp_quiver.png"
+        plt.savefig(str(_out_png), dpi=160, bbox_inches="tight")
         plt.show()
-        print(f"✓ Polarization quiver plot saved to figures/{save_prefix}_bfp_quiver.png")
+        print(f"✓ Polarization quiver plot saved to {_out_png}")
     
     def save_results(self, res: FarfieldSummary, filename: str = "data/summaries/polarization_results.json") -> None:
         """Save analysis results to file."""
@@ -512,10 +531,20 @@ class PolarizationAnalyzer:
             'wavelength_um': float(self.wavelength_um)
         }
         
-        with open(filename, 'w') as f:
+        from pathlib import Path as _Path
+        _path = _Path(filename)
+        if not _path.is_absolute():
+            _repo_root = _Path(__file__).resolve().parents[1]
+            # If caller passed a bare name like 'polarization_results.json', route to data/summaries
+            if _path.parent == _Path('.'):
+                _path = _repo_root / 'data' / 'summaries' / _path.name
+            else:
+                _path = _repo_root / _path
+        _path.parent.mkdir(parents=True, exist_ok=True)
+        with open(_path, 'w') as f:
             json.dump(results, f, indent=2)
         
-        print(f"✓ Polarization analysis results saved to {filename}")
+        print(f"✓ Polarization analysis results saved to {_path}")
 
 
 def analyze_polarization(data_path: str,

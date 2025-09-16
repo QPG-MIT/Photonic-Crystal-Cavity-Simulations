@@ -60,9 +60,10 @@ class SimulationSetup:
         print("🔧 SETTING UP GEOMETRY PARAMETERS")
         print("="*70)
         
-        # File paths
-        gds_path = Path("gds/Cavity.gds")
-        hole_gds_path = Path("gds/Holes.gds")
+        # File paths (resolve relative to repository root so notebooks/scripts work)
+        repo_root = Path(__file__).resolve().parents[1]
+        gds_path = (repo_root / "gds" / "Cavity.gds").resolve()
+        hole_gds_path = (repo_root / "gds" / "Holes.gds").resolve()
         
         # Improved padding - keep negative X padding to avoid spurious scattering
         pad_x_neg = -5.0   # left side (negative to avoid waveguide scattering)
@@ -540,7 +541,9 @@ class SimulationSetup:
         ax_yz.set_aspect('auto')
 
         fig.subplots_adjust(left=0.06, right=0.98, top=0.96, bottom=0.06)
-        plt.savefig('figures/simulation_setup.png', dpi=150, bbox_inches='tight')
+        fig_dir = Path(__file__).resolve().parents[1] / 'figures'
+        fig_dir.mkdir(parents=True, exist_ok=True)
+        plt.savefig(str(fig_dir / 'simulation_setup.png'), dpi=150, bbox_inches='tight')
         plt.show()
         print("✓ Visualization saved to figures/simulation_setup.png")
 
