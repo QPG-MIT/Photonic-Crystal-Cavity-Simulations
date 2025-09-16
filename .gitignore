@@ -1,81 +1,19 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+# Ignore everything
+/*
 
-# Virtual environments
-.venv/
-.venv-311/
-venv/
-ENV/
-env/
-.env
+# Keep this file
+!.gitignore
 
-# Jupyter Notebook
-.ipynb_checkpoints
+# Keep core code and files
+!modules/
+!modules/**
+!Cavity.gds
+!Holes.gds
+!requirements.txt
+!README.md
+!run_complete_analysis.py
+!Photonic_Cavity_Workflow.ipynb
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Project specific - exclude Previous directory and other non-essential files
-Previous/
-*.log
-*.tmp
-*.temp
-
-# Analysis results and visualizations (generated files)
-*.png
-*_results.json
-*_analysis_results.json
-*_analysis_report.json
-*_report.json
-*_summary.json
-lockin_summary_*.json
-scout_summary_*.json
-simulation_*.json
-results_*.json
-
-# Fine resolution results (large files, ignore to save space)
-results_*_fine.hdf5
-results_*_fine.json
-
-# Include only essential files by explicitly tracking them
-# The following files will be tracked:
-# - modules/ (all Python files)
-# - *.gds files
-# - *.ipynb files
-# - results_*.hdf5 files (except fine resolution)
-# - run_complete_analysis.py
-# - requirements.txt
-# - README.md (if created)
+# Keep ONLY 0.19 µm results
+!*0.19*.hdf5
+!*0.19*.json
