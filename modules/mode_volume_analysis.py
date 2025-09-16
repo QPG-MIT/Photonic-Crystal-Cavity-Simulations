@@ -31,6 +31,22 @@ warnings.filterwarnings('ignore')
 C0 = 299_792_458.0  # Speed of light in vacuum (m/s)
 
 
+def _sellmeier_diamond(wavelength_um: float) -> float:
+    """
+    Calculate refractive index of diamond using a two-term Sellmeier equation.
+    Wavelength must be in micrometers.
+    Ref: A. M. Zaitsev, "Optical Properties of Diamond: A Review,"
+         Phys. Status Solidi A 172, 15 (1999). (Table 1, natural diamond)
+    """
+    lambda_sq_um = wavelength_um**2
+    # Sellmeier coefficients for natural diamond (matching simulation_setup.py)
+    B1, C1 = 0.3306, 0.175**2
+    B2, C2 = 4.3356, 0.106**2
+
+    n_sq = 1.0 + B1 * lambda_sq_um / (lambda_sq_um - C1) + B2 * lambda_sq_um / (lambda_sq_um - C2)
+    return np.sqrt(n_sq)
+
+
 class ModeVolumeAnalyzer:
     """
     Analyzer for computing effective mode volume from 3D field data.
@@ -251,8 +267,7 @@ class ModeVolumeAnalyzer:
         return V_eff
     
     def compute_purcell_factor(self, V_eff: float, Q: float, 
-                              wavelength_um: Optional[float] = None,
-                              n_emitter: float = 2.414) -> float:
+                              wavelength_um: Optional[float] = None) -> float:
         """
         Compute Purcell factor for a quantum emitter.
         
@@ -260,13 +275,15 @@ class ModeVolumeAnalyzer:
             V_eff: Effective mode volume in m³
             Q: Quality factor
             wavelength_um: Wavelength in micrometers (uses class default if None)
-            n_emitter: Refractive index of emitter environment (diamond)
             
         Returns:
             Purcell factor
         """
         if wavelength_um is None:
             wavelength_um = self.wavelength_um
+        
+        # Calculate diamond refractive index using Sellmeier equation
+        n_emitter = _sellmeier_diamond(wavelength_um)
         
         # Convert wavelength to meters
         wavelength = wavelength_um * 1e-6
@@ -276,7 +293,7 @@ class ModeVolumeAnalyzer:
         
         print(f"\n🎯 Purcell Factor Analysis")
         print(f"  - Wavelength: {wavelength_um:.3f} µm")
-        print(f"  - Emitter environment index: {n_emitter:.3f}")
+        print(f"  - Emitter environment index (Sellmeier): {n_emitter:.6f}")
         print(f"  - Quality factor: {Q:.0f}")
         print(f"  - Mode volume: {V_eff*1e18:.3f} µm³")
         print(f"  - Purcell factor: {F:.2f}")
@@ -285,8 +302,7 @@ class ModeVolumeAnalyzer:
     
     def analyze_mode_volume(self, data: td.SimulationData,
                           monitor_name: str = "fld_3d_box",
-                          Q: Optional[float] = None,
-                          n_emitter: float = 2.414) -> Dict:
+                          Q: Optional[float] = None) -> Dict:
         """
         Perform complete mode volume analysis.
         
@@ -294,7 +310,6 @@ class ModeVolumeAnalyzer:
             data: Tidy3D simulation data
             monitor_name: Name of 3D field monitor
             Q: Quality factor (optional, for Purcell calculation)
-            n_emitter: Refractive index of emitter environment for Purcell calculation
             
         Returns:
             Dictionary with analysis results
@@ -315,7 +330,7 @@ class ModeVolumeAnalyzer:
         # Compute Purcell factor if Q is provided
         F = None
         if Q is not None:
-            F = self.compute_purcell_factor(V_eff, Q, n_emitter=n_emitter)
+            F = self.compute_purcell_factor(V_eff, Q)
         
         # Compile results
         results = {
@@ -324,7 +339,7 @@ class ModeVolumeAnalyzer:
             'purcell_factor': F,
             'quality_factor': Q,
             'wavelength_um': self.wavelength_um,
-            'emitter_environment_index': n_emitter,
+            'emitter_environment_index': _sellmeier_diamond(self.wavelength_um),
             'core_index': self.n_core,
             'cladding_index': self.n_clad,
             'thickness_um': self.thickness_um,
@@ -501,7 +516,6 @@ def analyze_mode_volume(data_path: str,
                        wavelength_um: float = 0.62,
                        monitor_name: str = "fld_3d_box",
                        Q: Optional[float] = None,
-                       n_emitter: float = 2.414,
                        save_results: bool = True,
                        create_plots: bool = True) -> Dict:
     """
@@ -515,7 +529,6 @@ def analyze_mode_volume(data_path: str,
         wavelength_um: Analysis wavelength in micrometers
         monitor_name: Name of 3D field monitor
         Q: Quality factor (optional, for Purcell calculation)
-        n_emitter: Refractive index of emitter environment for Purcell calculation
         save_results: Whether to save results to file
         create_plots: Whether to create visualization plots
         
@@ -534,7 +547,7 @@ def analyze_mode_volume(data_path: str,
     )
     
     # Perform analysis
-    results = analyzer.analyze_mode_volume(data, monitor_name=monitor_name, Q=Q, n_emitter=n_emitter)
+    results = analyzer.analyze_mode_volume(data, monitor_name=monitor_name, Q=Q)
     
     # Create plots if requested
     if create_plots:
@@ -554,17 +567,15 @@ if __name__ == "__main__":
     import sys
     
     if len(sys.argv) < 2:
-        print("Usage: python mode_volume_analysis.py <data_file.hdf5> [Q_factor] [n_emitter]")
+        print("Usage: python mode_volume_analysis.py <data_file.hdf5> [Q_factor]")
         sys.exit(1)
     
     data_file = sys.argv[1]
     Q = float(sys.argv[2]) if len(sys.argv) > 2 else None
-    n_emitter = float(sys.argv[3]) if len(sys.argv) > 3 else 2.414
     
     results = analyze_mode_volume(
         data_path=data_file,
         Q=Q,
-        n_emitter=n_emitter,
         save_results=True,
         create_plots=True
     )

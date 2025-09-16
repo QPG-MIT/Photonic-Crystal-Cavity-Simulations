@@ -16,6 +16,7 @@ Key Features:
 import numpy as np
 import tidy3d as td
 from tidy3d import web
+import os
 from pathlib import Path
 import warnings
 from typing import Optional, Dict, Any, Tuple
@@ -39,6 +40,31 @@ class SimulationRunner:
         """
         self.task_name = task_name
         self.results_cache = {}
+        # Attempt to configure web API from environment for clearer diagnostics
+        api_key = os.environ.get("TIDY3D_API_KEY")
+        region = os.environ.get("TIDY3D_REGION")
+        try:
+            if api_key:
+                # Try the newer API first, then fall back to older API
+                try:
+                    web.configure(api_key=api_key, region=region)
+                except TypeError:
+                    # Newer Tidy3D versions might not accept api_key parameter
+                    try:
+                        web.configure(region=region)
+                        # Set API key via environment or other method
+                        os.environ["TIDY3D_API_KEY"] = api_key
+                    except Exception:
+                        pass
+            else:
+                # If already authenticated, this is a no-op; otherwise prompts in interactive sessions
+                try:
+                    web.login()
+                except Exception:
+                    pass
+        except Exception as _cfg_exc:
+            # Non-fatal; configuration can still occur elsewhere
+            print(f"⚠️  Tidy3D web.configure/login failed: {_cfg_exc}")
         
     def load_simulation(self, sim_file: str) -> td.Simulation:
         """
@@ -111,10 +137,17 @@ class SimulationRunner:
             return estimated_cost
             
         except Exception as e:
-            print(f"❌ Could not estimate cost: {e}")
+            # Provide clearer diagnostics for common causes
+            has_token = bool(os.environ.get("TIDY3D_API_KEY"))
+            region = os.environ.get("TIDY3D_REGION") or "default"
+            print("❌ Could not estimate cost.")
+            print(f"  - Reason: {repr(e)}")
+            print(f"  - TIDY3D_API_KEY present in env: {has_token}")
+            print(f"  - TIDY3D_REGION: {region}")
+            print("  - Tip: On Tidy3D >=2.9, use tidy3d.web.configure(api_key=...) or tidy3d.web.login().")
             return None
     
-    def check_existing_results(self, results_path: str) -> bool:
+    def check_existing_results(self, results_path: str, expected_monitors: Optional[list] = None) -> bool:
         """
         Check if simulation results already exist.
         
@@ -132,7 +165,8 @@ class SimulationRunner:
             data = td.SimulationData.from_file(results_path)
             
             # Check if we have the expected monitors
-            expected_monitors = ['probe', 'flux', 'field_near']
+            if expected_monitors is None:
+                expected_monitors = ['probe', 'flux', 'field_near']
             available_monitors = list(data.monitor_data.keys())
             
             missing_monitors = [m for m in expected_monitors if m not in available_monitors]
@@ -153,7 +187,8 @@ class SimulationRunner:
                       results_path: str = "simulation_results.hdf5",
                       task_name: Optional[str] = None,
                       force_rerun: bool = False,
-                      estimate_cost_first: bool = True) -> Optional[td.SimulationData]:
+                      estimate_cost_first: bool = True,
+                      expected_monitors: Optional[list] = None) -> Optional[td.SimulationData]:
         """
         Run the simulation with comprehensive error handling.
         
@@ -176,7 +211,7 @@ class SimulationRunner:
         print(f"  - Run time: {simulation.run_time*1e12:.1f} ps")
         
         # Check for existing results
-        if not force_rerun and self.check_existing_results(results_path):
+        if not force_rerun and self.check_existing_results(results_path, expected_monitors=expected_monitors):
             print("✓ Using existing results (use force_rerun=True to override)")
             try:
                 return td.SimulationData.from_file(results_path)
@@ -210,7 +245,8 @@ class SimulationRunner:
                 simulation,
                 task_name=task_name,
                 folder_name="default",
-                path=results_path
+                path=results_path,
+                verbose=True
             )
             
             elapsed_time = time.time() - start_time

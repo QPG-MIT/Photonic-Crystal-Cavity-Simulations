@@ -36,16 +36,21 @@ class SimulationSetup:
     Handles the setup and configuration of Tidy3D simulations for photonic cavities.
     """
     
-    def __init__(self, thickness_um: float = 0.14, wavelength_um: float = 0.62):
+    def __init__(self,
+                 thickness_um: float = 0.14,
+                 wavelength_um: float = 0.62,
+                 source_bandwidth_rel: float = 0.12):
         """
         Initialize simulation setup parameters.
-        
+
         Args:
             thickness_um: Cavity thickness in micrometers
             wavelength_um: Analysis wavelength in micrometers
+            source_bandwidth_rel: Relative bandwidth (Δf/f0) of the Gaussian source
         """
         self.thickness_um = thickness_um
         self.wavelength_um = wavelength_um
+        self.source_bandwidth_rel = source_bandwidth_rel
         self.params = self._setup_geometry_parameters()
         self.diamond_medium, self.clad_medium, self.f0_center = self._create_diamond_medium()
         
@@ -96,23 +101,45 @@ class SimulationSetup:
         }
     
     def _create_diamond_medium(self) -> Tuple[td.Medium, td.Medium, float]:
-        """Create diamond medium with correct refractive index for the analysis wavelength."""
+        """Create diamond medium using Sellmeier dispersion evaluated at λ."""
         print("\n🔬 Creating diamond medium...")
-        
-        # Diamond refractive index at 620nm (correct value)
-        n_diamond = 2.414
-        
-        print(f"  - n(λ={self.wavelength_um:.3f} µm) = {n_diamond:.6f} (correct for diamond at 620nm)")
-        print(f"  - Using constant permittivity (narrowband simulation)")
-        
-        # Create medium with correct refractive index
+
+        def n_diamond_sellmeier(lambda_um: float) -> float:
+            """Sellmeier model for diamond (λ in µm).
+
+            n^2(λ) = 1 + (B1 λ^2)/(λ^2 - C1) + (B2 λ^2)/(λ^2 - C2)
+            Coefficients from literature (valid roughly 0.23–5 µm):
+              B1=0.3306, C1=0.175^2; B2=4.3356, C2=0.106^2
+            """
+            lam2 = float(lambda_um)**2
+            B1, C1 = 0.3306, 0.175**2
+            B2, C2 = 4.3356, 0.106**2
+            n2 = 1.0 + B1 * lam2 / (lam2 - C1) + B2 * lam2 / (lam2 - C2)
+            return float(np.sqrt(n2))
+
+        n_diamond = n_diamond_sellmeier(self.wavelength_um)
+
+        print(f"  - Using Sellmeier dispersion evaluated at λ={self.wavelength_um:.3f} µm")
+        print(f"  - n(λ) = {n_diamond:.6f} → ε = {n_diamond**2:.6f}")
+        print(f"  - Note: medium is set with ε(λ0); full dispersion not invoked for narrowband run")
+
+        # Create media
         diamond_medium = td.Medium(permittivity=n_diamond**2)
         clad_medium = td.Medium(permittivity=1.0)
-        
+
         # Calculate center frequency
         f0_center = C0 / (self.wavelength_um * 1e-6)
-        
+
         return diamond_medium, clad_medium, f0_center
+
+    @staticmethod
+    def diamond_n_sellmeier(lambda_um: float) -> float:
+        """Public helper: diamond refractive index n(λ) via Sellmeier (no prints)."""
+        lam2 = float(lambda_um)**2
+        B1, C1 = 0.3306, 0.175**2
+        B2, C2 = 4.3356, 0.106**2
+        n2 = 1.0 + B1 * lam2 / (lam2 - C1) + B2 * lam2 / (lam2 - C2)
+        return float(np.sqrt(n2))
     
     def extract_geometry_from_gds(self) -> Dict:
         """Extract geometry from GDS files with improved bounds."""
@@ -253,14 +280,14 @@ class SimulationSetup:
             center=(geom_params['cx'], geom_params['cy'], 0.0),
             source_time=td.GaussianPulse(
                 freq0=self.f0_center,
-                fwidth=self.f0_center * 0.12,  # 12% bandwidth
+                fwidth=self.f0_center * self.source_bandwidth_rel,
             ),
             polarization="Ey",
         )
-        
+
         print(f"  - Source: Point dipole at ({geom_params['cx']:.3f}, {geom_params['cy']:.3f}, 0.0)")
         print(f"  - Frequency: {self.f0_center/1e12:.3f} THz")
-        print(f"  - Bandwidth: {self.f0_center * 0.12/1e12:.2f} THz")
+        print(f"  - Bandwidth: {self.f0_center * self.source_bandwidth_rel/1e12:.2f} THz")
         
         # Create basic monitors
         monitors = []
@@ -295,6 +322,29 @@ class SimulationSetup:
         print(f"  - Created {len(monitors)} basic monitors")
         
         return source, monitors
+
+    def create_minimal_q_probe(self, geom_params: Dict) -> Tuple[td.PointDipole, List[td.Monitor]]:
+        """Create a minimal source and only the time-domain probe needed for Q analysis."""
+        print("\n📡 Creating minimal source and Q-probe monitor...")
+
+        source = td.PointDipole(
+            center=(geom_params['cx'], geom_params['cy'], 0.0),
+            source_time=td.GaussianPulse(
+                freq0=self.f0_center,
+                fwidth=self.f0_center * self.source_bandwidth_rel,
+            ),
+            polarization="Ey",
+        )
+
+        probe_monitor = td.FieldTimeMonitor(
+            center=(geom_params['cx'], geom_params['cy'], 0.0),
+            size=(0, 0, 0),
+            name="probe",
+            interval=5,
+        )
+
+        print("  - Created minimal monitor set: ['probe']")
+        return source, [probe_monitor]
     
     def create_farfield_monitors(self, geom_params: Dict) -> List[td.Monitor]:
         """Create improved far-field monitors."""
@@ -412,6 +462,41 @@ class SimulationSetup:
         print(f"  - Grid: min_steps_per_wvl=18 with wavelength={self.wavelength_um} µm")
         print(f"  - Boundaries: PML(8 layers)")
         
+        return simulation
+
+    def create_q_scout_simulation(self, run_time_ps: float = 10.0) -> td.Simulation:
+        """Create a simplified simulation for the scout stage (Q-only probe)."""
+        print("\n🚀 Creating minimal scout simulation (Q-only)...")
+
+        # Extract geometry
+        geom_params = self.extract_geometry_from_gds()
+
+        # Create structures
+        core_struct = self.create_core_structure(geom_params)
+        hole_structs = self.create_hole_structures(geom_params)
+        all_structures = [core_struct] + hole_structs
+
+        # Create minimal source + probe
+        source, probe_monitors = self.create_minimal_q_probe(geom_params)
+
+        # Create simulation with specified run time
+        run_time = run_time_ps * 1e-12  # Convert ps to seconds
+
+        simulation = td.Simulation(
+            size=(geom_params['size_x'], geom_params['size_y'], geom_params['size_z']),
+            center=(geom_params['cx'], geom_params['cy'], geom_params['cz']),
+            grid_spec=td.GridSpec.auto(min_steps_per_wvl=18, wavelength=self.wavelength_um),
+            structures=all_structures,
+            sources=[source],
+            monitors=probe_monitors,
+            run_time=run_time,
+            boundary_spec=td.BoundarySpec.all_sides(boundary=td.PML()),
+        )
+
+        print(f"✓ Minimal scout simulation created successfully")
+        print(f"  - Structures: {len(all_structures)}")
+        print(f"  - Monitors: {len(probe_monitors)} (probe only)")
+        print(f"  - Run time: {run_time_ps:.1f} ps")
         return simulation
     
     def save_simulation(self, simulation: td.Simulation, filename: str) -> None:
