@@ -6,7 +6,7 @@
 
 # Keep core code and files
 !modules/
-!modules/**
+!modules/*.py
 !Cavity.gds
 !Holes.gds
 !requirements.txt
@@ -17,3 +17,8 @@
 # Keep ONLY 0.19 µm results
 !*0.19*.hdf5
 !*0.19*.json
+
+# Always ignore caches/compiled files
+modules/__pycache__/
+__pycache__/
+*.pyc
