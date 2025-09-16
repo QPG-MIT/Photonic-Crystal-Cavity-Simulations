@@ -1,0 +1,285 @@
+================================================================================
+🎯 LOCK-IN STAGE — narrowband analysis
+================================================================================
+Using lock-in wavelength 0.636502 µm (470.999895 THz)
+======================================================================
+🔧 SETTING UP GEOMETRY PARAMETERS
+======================================================================
+✓ Geometry parameters loaded
+  - Cavity thickness: 0.16 µm
+  - Wavelength: 0.6365021755339165 µm
+  - Optimized padding: x=[-5.0, -5.0], y=[2.0, 2.0], z=[2.0, 2.0]
+
+🔬 Creating diamond medium...
+  - Using Sellmeier dispersion evaluated at λ=0.637 µm
+  - n(λ) = 2.411827 → ε = 5.816908
+  - Note: medium is set with ε(λ₀); full dispersion not invoked for narrowband run
+
+🚀 Creating complete simulation...
+
+📐 Extracting geometry from GDS files...
+  - Using cell: TOP
+  - Original bbox: x[-15.675, 15.675], y[-0.150, 0.150]
+  - Geometry bbox: x[-15.675, 15.675], y[-0.150, 0.150]
+  - Simulation domain: left=-10.675, right=10.675, bottom=-2.150, top=2.150
+  - X truncation: 31.350 → 21.350 µm (reduced by 10.000 µm)
+  - Simulation size: (21.350, 4.300, 4.160) µm
+  - Simulation center: (0.000, 0.000, 0.000) µm
+
+🏗️  Creating core structure...
+  - Core rectangle created with 4 vertices
+  - Thickness: 0.16 µm
+
+🕳️  Creating hole structures...
+  - Using holes cell: Unnamed_48
+  - Imported 100 hole polygon(s)
+  - Created 1 hole structure(s)
+  - Thickness: 0.16 µm
+
+📡 Creating sources and monitors...
+  - Source: Point dipole at (0.000, 0.000, 0.0)
+  - Frequency: 471.000 THz
+  - Bandwidth: 9.42 THz
+  - Created 3 basic monitors
+
+🌐 Creating improved far-field monitors...
+  - Positioning monitors at z = 1.5 µm
+  - Monitor size: 8.0 µm
+  - Created 3 improved far-field monitors
+✓ Complete simulation created successfully
+  - Structures: 2
+  - Monitors: 7
+  - Run time: 8.0 ps
+  - Grid: min_steps_per_wvl=18 with wavelength=0.6365021755339165 µm
+  - Boundaries: PML(8 layers)
+
+💾 Saving simulation to simulation_lockin_full_0.16um.json...
+✓ Simulation saved successfully
+  - File: simulation_lockin_full_0.16um.json
+  - Size: 356.2 KB
+⚠️  Tidy3D web.configure/login failed: configure_fn() got an unexpected keyword argument 'api_key'
+
+🎯 RUNNING SIMULATION
+  - Task name: photonic_cavity_lockin_0.16um
+  - Output path: results_lockin_full_0.16um.hdf5
+  - Run time: 8.0 ps
+
+⚠️  Could not estimate cost. Proceeding without cost information.
+Are you sure you want to run the simulation? (y/N): 
+🚀 Running simulation...
+16:20:43 EDT Created task 'photonic_cavity_lockin_0.16um' with task_id          
+             'fdve-d99cf865-8ee1-4aa1-bbec-abaa6e26b870' and task_type 'FDTD'.  
+             View task using web UI at                                          
+             'https://tidy3d.simulation.cloud/workbench?taskId=fdve-d99cf865-8ee
+             1-4aa1-bbec-abaa6e26b870'.                                         
+             Task folder: 'default'.                                            
+↑ simulation.hdf5.gz ━━━━━━━━━━━━━━━━━━━━━━━ 100.0% • 13.1/13.1 kB • ? • 0:00:00
+16:20:44 EDT Maximum FlexCredit cost: 3.165. Minimum cost depends on task       
+             execution details. Use 'web.real_cost(task_id)' to get the billed  
+             FlexCredit cost after a simulation run.                            
+16:20:45 EDT status = queued                                                    
+             To cancel the simulation, use 'web.abort(task_id)' or              
+             'web.delete(task_id)' or abort/delete the task in the web UI.      
+             Terminating the Python script will not stop the job running on the 
+             cloud.                                                             
+16:20:52 EDT status = preprocess                                                
+16:20:56 EDT starting up solver                                                 
+             running solver                                                     
+solver progress (field decay = 1.10e-01) ━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00
+16:25:32 EDT status = postprocess                                               
+16:25:36 EDT status = success                                                   
+16:25:38 EDT View simulation result at                                          
+             'https://tidy3d.simulation.cloud/workbench?taskId=fdve-d99cf865-8ee
+             1-4aa1-bbec-abaa6e26b870'.                                         
+↓ simulation_data.hdf5.gz ━━━━━━━━━━━━ 100.0% • 69.1/69.1   • 9.7 MB/s • 0:00:00
+                                                MB                              
+16:25:46 EDT loading simulation from results_lockin_full_0.16um.hdf5            
+             WARNING: Simulation final field decay value of 0.11 is greater than
+             the simulation shutoff threshold of 1e-05. Consider running the    
+             simulation again with a larger 'run_time' duration for more        
+             accurate results.                                                  
+✓ Simulation completed successfully in 304.1 seconds!
+
+🔍 Validating simulation results...
+✓ All required monitors present
+✓ Probe data: 58373 time points, 8.00 ps duration
+✓ Flux data: -1.21e-02
+✓ Field data: (875, 90, 1, 1)
+✓ Far-field monitors: ['farfield_cartesian', 'farfield_kspace', 'farfield_angles']
+✓ Results validation complete
+======================================================================
+🔬 MODE VOLUME ANALYSIS
+======================================================================
+✓ Loaded 3D field data
+  - Field shape: (68, 102, 411)
+  - X range: -3.005 to 3.005 µm
+  - Y range: -1.513 to 1.513 µm
+  - Z range: -1.019 to 1.019 µm
+
+🔧 Creating permittivity map from GDS geometry...
+  - Cavity bounds: x[-15.675, 15.675] µm, y[-0.150, 0.150] µm
+  - Found 100 hole polygons
+  - Field shape: (z=68, y=102, x=411)
+  - Permittivity map created: (68, 102, 411)
+  - Core volume fraction: 0.026
+
+📊 Computing effective mode volume...
+  - Volume element: 13367346187645.160 µm³
+  - Maximum ε|E|²: 2.54e+11
+  - Total weighted energy: 6.20e-09
+  - Effective mode volume: 2.439e-20 m³ = 0.024 µm³
+
+🎯 Purcell Factor Analysis
+  - Wavelength: 0.637 µm
+  - Emitter environment index (Sellmeier): 2.713744
+  - Quality factor: 12537
+  - Mode volume: 0.024 µm³
+  - Purcell factor: 503.98
+✓ Loaded 3D field data
+  - Field shape: (68, 102, 411)
+  - X range: -3.005 to 3.005 µm
+  - Y range: -1.513 to 1.513 µm
+  - Z range: -1.019 to 1.019 µm
+
+🔧 Creating permittivity map from GDS geometry...
+  - Cavity bounds: x[-15.675, 15.675] µm, y[-0.150, 0.150] µm
+  - Found 100 hole polygons
+  - Field shape: (z=68, y=102, x=411)
+  - Permittivity map created: (68, 102, 411)
+  - Core volume fraction: 0.026
+
+📊 Creating field distribution plots...
+✓ Field distribution plots saved to mode_volume_field.png
+✓ Mode volume analysis results saved to mode_volume_results.json
+✓ Mode volume analysis completed
+======================================================================
+🔬 FAR-FIELD POLARIZATION ANALYSIS
+======================================================================
+✓ Using angle monitor: farfield_angles
+✓ Extracted far-field data
+  - Field shape: (100, 200)
+  - Theta range: 0.0° to 90.0°
+  - Phi range: 0.0° to 360.0°
+✓ Calculated NA cone
+  - NA: 0.9
+  - Background index: 1.0
+  - Theta max: 64.2°
+✓ Calculated polarization metrics
+  - DoLP: 0.051
+  - DoCP: 0.001
+  - DoP: 0.051
+  - Psi: 0.0°
+  - Chi: -0.0°
+✓ Collection efficiency: 92.20%
+✓ Polarization state: mostly unpolarized
+
+📊 Creating theta-phi heatmaps...
+✓ Theta-phi heatmaps saved to polarization_heatmaps.png
+
+📊 Creating azimuthal averages...
+✓ Azimuthal averages saved to polarization_azimuthal.png
+
+📊 Creating back focal plane plot...
+✓ Back focal plane plot saved to polarization_bfp.png
+
+📊 Creating polarization quiver plot...
+✓ Polarization quiver plot saved to polarization_bfp_quiver.png
+✓ Polarization analysis results saved to polarization_results.json
+✓ Polarization analysis completed
+======================================================================
+🔬 NEAR-FIELD ANALYSIS
+======================================================================
+Field array shapes: Ex2=(90, 875), Ey2=(90, 875), Ez2=(90, 875), I=(90, 875)
+Coordinate lengths: x=875 (Nx), y=90 (Ny)
+  - X range: -6.407 to 6.407 µm
+  - Y range: -1.301 to 1.301 µm
+  - Max intensity: 4.32e+10
+  - Total power (sum of |E|^2): 1.19e+13
+
+📊 Field confinement analysis:
+  - 1/e² width (x): 2.753 µm
+  - 1/e² width (y): 0.346 µm
+  - Confinement area: 0.952 µm²
+  - Aspect ratio (x/y): 7.96
+
+📐 Mode parameters:
+  - dx, dy: 0.0147 µm, 0.0354 µm (dA=0.0005 µm²)
+  - A_eff: 1.152 µm²
+  - A_eff (λ²): 2.844
+  - Effective index (rough): 2.40
+
+📈 Field quality metrics:
+  - Field uniformity (std/mean): 5.868
+  - Ex/Ey/Ez fractions: 0.336 / 0.664 / 0.000
+  - Field concentration (top 10%): 0.994
+
+📊 Creating near-field analysis plots...
+✓ Near-field analysis plots saved to 'nearfield_analysis.png'
+✓ Near-field analysis results saved to nearfield_analysis_results.json
+✓ Near-field analysis completed
+======================================================================
+🌐 FAR-FIELD ANALYSIS
+======================================================================
+✓ Found monitor: farfield_kspace
+✓ Found monitor: farfield_angles
+
+--- Analyzing farfield_kspace ---
+  - Intensity range: 3.00e-09 to 6.60e-07
+  - Total intensity: 3.47e-04
+  - Field shape: (40, 40)
+
+--- Analyzing farfield_angles ---
+  - Directivity: 0.00
+  - Beam width: nan°
+  - Intensity range: 2.12e-09 to 6.71e-07
+  - Total intensity: 5.10e-03
+  - Field shape: (100, 200)
+
+📊 Collection efficiency analysis:
+  - Total power (upper hemisphere only): 2.18e-03
+  - Total power (full sphere): 4.36e-03
+  - Collected power: 2.01e-03
+  - Collection efficiency: 0.461 (46.1%)
+  - Collection angle: ±64.2°
+
+📊 Creating far-field analysis plots...
+
+📊 Creating collection efficiency vs NA plot...
+✓ Collection efficiency vs NA plot saved to 'collection_efficiency_vs_na.png'
+✓ Far-field analysis results saved to farfield_analysis_results.json
+✓ Far-field analysis completed
+======================================================================
+📊 COLLECTION EFFICIENCY ANALYSIS
+======================================================================
+✓ Found monitor: farfield_kspace
+✓ Found monitor: farfield_angles
+
+--- Analyzing collection efficiency for farfield_kspace ---
+  - No k-space coordinates available
+  - Collection efficiency: 0.000
+  - Total power (unknown): 0.00e+00
+  - Total power (full sphere): 0.00e+00
+  - Collected power: 0.00e+00
+
+--- Analyzing collection efficiency for farfield_angles ---
+  - Collection efficiency: 0.461
+  - Total power (upper hemisphere only): 2.18e-03
+  - Total power (full sphere): 4.36e-03
+  - Collected power: 2.01e-03
+
+📊 Overall collection efficiency analysis:
+  - Overall collection efficiency: 0.461 (46.1%)
+  - Mean efficiency: 0.461 ± 0.000
+  - Range: 0.461 to 0.461
+  - Total power: 4.36e-03
+  - Collected power: 2.01e-03
+✓ Collection efficiency results saved to collection_efficiency_results.json
+✓ Collection efficiency analysis completed
+✓ Lock-in summary written to lockin_summary_0.16um.json
+
+================================================================================
+📋 WORKFLOW SUMMARY
+================================================================================
+Lock-in: λ = 0.636502 µm, Vₑff = 0.024 µm³, Fp = 503.98, η = 46.1%
+
+🏁 WORKFLOW COMPLETE

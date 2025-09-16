@@ -672,7 +672,7 @@ class FarFieldAnalyzer:
             axes[i].set_visible(False)
         
         plt.tight_layout()
-        plt.savefig('farfield_analysis.png', dpi=300, bbox_inches='tight')
+        plt.savefig('figures/farfield_analysis.png', dpi=300, bbox_inches='tight')
         plt.show()
         
         # Create separate collection efficiency vs NA plot
@@ -772,7 +772,7 @@ class FarFieldAnalyzer:
 
         # Save/show
         plt.tight_layout()
-        plt.savefig('collection_efficiency_vs_na.png', dpi=300)
+        plt.savefig('figures/collection_efficiency_vs_na.png', dpi=300)
         plt.show()
         
         print("✓ Collection efficiency vs NA plot saved to 'collection_efficiency_vs_na.png'")
@@ -814,7 +814,7 @@ class FarFieldAnalyzer:
                     'radiation_metrics': monitor_results.get('radiation_metrics', {})
                 }
         
-        filename = 'farfield_analysis_results.json'
+        filename = 'data/summaries/farfield_analysis_results.json'
         with open(filename, 'w') as f:
             json.dump(json_results, f, indent=2)
         

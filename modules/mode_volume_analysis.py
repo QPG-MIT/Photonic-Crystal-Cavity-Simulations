@@ -53,8 +53,8 @@ class ModeVolumeAnalyzer:
     """
     
     def __init__(self, 
-                 cavity_gds: str = "Cavity.gds",
-                 holes_gds: str = "Holes.gds",
+                 cavity_gds: str = "gds/Cavity.gds",
+                 holes_gds: str = "gds/Holes.gds",
                  thickness_um: float = 0.14,
                  wavelength_um: float = 0.62,
                  hole_layer: int = 0,
@@ -355,7 +355,7 @@ class ModeVolumeAnalyzer:
     
     def plot_field_distribution(self, Ex: np.ndarray, Ey: np.ndarray, Ez: np.ndarray,
                                x: np.ndarray, y: np.ndarray, z: np.ndarray,
-                               eps: np.ndarray, save_file: str = "mode_volume_field.png") -> None:
+                               eps: np.ndarray, save_file: str = "figures/mode_volume_field.png") -> None:
         """
         Plot 3D field distribution with structure outlines in linear and log scales.
         
@@ -499,7 +499,7 @@ class ModeVolumeAnalyzer:
         except Exception as e:
             print(f"Warning: Could not add structure outline to YZ plane: {e}")
     
-    def save_results(self, results: Dict, filename: str = "mode_volume_results.json") -> None:
+    def save_results(self, results: Dict, filename: str = "data/summaries/mode_volume_results.json") -> None:
         """Save analysis results to file."""
         import json
         

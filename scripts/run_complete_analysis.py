@@ -140,18 +140,18 @@ def build_default_workflow_config(
         name="scout",
         run_time_ps=12.0,
         bandwidth_rel=0.12,
-        simulation_path=Path(f"simulation_scout_q_only_{tag}um.json"),
-        results_path=Path(f"results_scout_q_only_{tag}um.hdf5"),
-        summary_path=Path(f"scout_summary_{tag}um.json"),
+        simulation_path=Path(f"data/simulations/simulation_scout_q_only_{tag}um.json"),
+        results_path=Path(f"data/results/results_scout_q_only_{tag}um.hdf5"),
+        summary_path=Path(f"data/summaries/scout_summary_{tag}um.json"),
         task_name=f"photonic_cavity_scout_{tag}um",
     )
     lockin = StageOptions(
         name="lockin",
         run_time_ps=8.0,
         bandwidth_rel=0.02,
-        simulation_path=Path(f"simulation_lockin_full_{tag}um.json"),
-        results_path=Path(f"results_lockin_full_{tag}um.hdf5"),
-        summary_path=Path(f"lockin_summary_{tag}um.json"),
+        simulation_path=Path(f"data/simulations/simulation_lockin_full_{tag}um.json"),
+        results_path=Path(f"data/results/results_lockin_full_{tag}um.hdf5"),
+        summary_path=Path(f"data/summaries/lockin_summary_{tag}um.json"),
         task_name=f"photonic_cavity_lockin_{tag}um",
     )
     return WorkflowConfig(

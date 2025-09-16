@@ -61,8 +61,8 @@ class SimulationSetup:
         print("="*70)
         
         # File paths
-        gds_path = Path("Cavity.gds")
-        hole_gds_path = Path("Holes.gds")
+        gds_path = Path("gds/Cavity.gds")
+        hole_gds_path = Path("gds/Holes.gds")
         
         # Improved padding - keep negative X padding to avoid spurious scattering
         pad_x_neg = -5.0   # left side (negative to avoid waveguide scattering)
@@ -540,9 +540,9 @@ class SimulationSetup:
         ax_yz.set_aspect('auto')
 
         fig.subplots_adjust(left=0.06, right=0.98, top=0.96, bottom=0.06)
-        plt.savefig('simulation_setup.png', dpi=150, bbox_inches='tight')
+        plt.savefig('figures/simulation_setup.png', dpi=150, bbox_inches='tight')
         plt.show()
-        print("✓ Visualization saved to simulation_setup.png")
+        print("✓ Visualization saved to figures/simulation_setup.png")
 
 
 def create_simulation_setup(thickness_um: float = 0.14, 

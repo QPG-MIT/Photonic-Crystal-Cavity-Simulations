@@ -373,7 +373,7 @@ class SimulationRunner:
 
 
 def run_simulation_from_file(sim_file: str,
-                           results_path: str = "simulation_results.hdf5",
+                           results_path: str = "data/results/simulation_results.hdf5",
                            task_name: str = "photonic_cavity_simulation",
                            force_rerun: bool = False,
                            estimate_cost: bool = True) -> Optional[td.SimulationData]:
@@ -423,7 +423,7 @@ if __name__ == "__main__":
         sys.exit(1)
     
     sim_file = sys.argv[1]
-    results_file = sys.argv[2] if len(sys.argv) > 2 else "simulation_results.hdf5"
+    results_file = sys.argv[2] if len(sys.argv) > 2 else "data/results/simulation_results.hdf5"
     
     data = run_simulation_from_file(
         sim_file=sim_file,

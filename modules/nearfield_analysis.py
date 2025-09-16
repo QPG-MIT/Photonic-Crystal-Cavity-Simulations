@@ -509,9 +509,9 @@ class NearFieldAnalyzer:
         self._add_structure_outline_nearfield(axes[2], x, y, color="darkgrey")
 
         plt.tight_layout()
-        plt.savefig("nearfield_analysis.png", dpi=300, bbox_inches="tight")
+        plt.savefig("figures/nearfield_analysis.png", dpi=300, bbox_inches="tight")
         plt.show()
-        print("✓ Near-field analysis plots saved to 'nearfield_analysis.png'")
+        print("✓ Near-field analysis plots saved to 'figures/nearfield_analysis.png'")
 
     def _create_individual_field_plot(self, I: np.ndarray, x: np.ndarray, y: np.ndarray):
         """Create an individual plot for the field intensity with structure outline."""
@@ -549,9 +549,9 @@ class NearFieldAnalyzer:
         )
 
         plt.tight_layout()
-        plt.savefig("nearfield_intensity_individual.png", dpi=300, bbox_inches="tight")
+        plt.savefig("figures/nearfield_intensity_individual.png", dpi=300, bbox_inches="tight")
         plt.show()
-        print("✓ Individual field intensity plot saved to 'nearfield_intensity_individual.png'")
+        print("✓ Individual field intensity plot saved to 'figures/nearfield_intensity_individual.png'")
 
     # ------------------------------ Overlays ------------------------------
 
@@ -559,8 +559,8 @@ class NearFieldAnalyzer:
         self,
         x: np.ndarray,
         y: np.ndarray,
-        cavity_gds: str = "Cavity.gds",
-        holes_gds: str = "Holes.gds",
+        cavity_gds: str = "gds/Cavity.gds",
+        holes_gds: str = "gds/Holes.gds",
         hole_layer: int = 0,
         hole_dtype: int = 0,
         n_core: float = 2.414,
@@ -640,8 +640,8 @@ class NearFieldAnalyzer:
         self,
         ax,
         *,
-        cavity_gds: str = "Cavity.gds",
-        holes_gds: str = "Holes.gds",
+        cavity_gds: str = "gds/Cavity.gds",
+        holes_gds: str = "gds/Holes.gds",
         hole_layer: int = 0,
         hole_dtype: int = 0,
     ):
@@ -720,7 +720,7 @@ class NearFieldAnalyzer:
             else:
                 json_results[key] = self._to_json(value)
 
-        filename = "nearfield_analysis_results.json"
+        filename = "data/summaries/nearfield_analysis_results.json"
         with open(filename, "w") as f:
             json.dump(json_results, f, indent=2)
         print(f"✓ Near-field analysis results saved to {filename}")

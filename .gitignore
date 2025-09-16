@@ -7,12 +7,24 @@
 # Keep core code and files
 !modules/
 !modules/*.py
+!scripts/
+!scripts/*.py
+!gds/
+!gds/*.gds
+!data/
+!data/simulations/
+!data/summaries/
+data/results/*.hdf5
+!data/results/*0.19*.hdf5
+!notebooks/
+!figures/
+!logs/
 !Cavity.gds
 !Holes.gds
 !requirements.txt
 !README.md
 !run_complete_analysis.py
-!Photonic_Cavity_Workflow.ipynb
+!notebooks/Photonic_Cavity_Workflow.ipynb
 
 # Keep ONLY 0.19 µm results
 !*0.19*.hdf5

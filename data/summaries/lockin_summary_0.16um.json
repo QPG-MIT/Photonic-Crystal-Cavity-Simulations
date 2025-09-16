@@ -1,0 +1,20 @@
+{
+  "stage": "lockin",
+  "simulation_file": "simulation_lockin_full_0.16um.json",
+  "results_file": "results_lockin_full_0.16um.hdf5",
+  "run_time_ps": 8.0,
+  "bandwidth_rel": 0.02,
+  "lockin_wavelength_um": 0.6365021755339165,
+  "lockin_frequency_thz": 470.9998952454881,
+  "q_factor": 12537.086780781054,
+  "mode_volume_um3": 0.024391703409799823,
+  "purcell_factor": 717.9222996596269,
+  "dolp": 0.05100771533888579,
+  "docp": 0.0012123570667078075,
+  "dop": 0.05102212102363053,
+  "psi_deg": 0.0017327660909833202,
+  "chi_deg": -0.034731480100723244,
+  "nearfield_confinement_um2": 0.9520186441191112,
+  "nearfield_mode_area_um2": 1.1522719860076904,
+  "collection_efficiency": 0.46068730869596
+}

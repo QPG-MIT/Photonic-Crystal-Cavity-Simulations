@@ -1,0 +1,12 @@
+{
+  "stage": "scout",
+  "simulation_file": "simulation_scout_q_only_0.16um.json",
+  "results_file": "results_scout_q_only_0.16um.hdf5",
+  "run_time_ps": 12.0,
+  "bandwidth_rel": 0.12,
+  "resonance_frequency_thz": 470.9998952454881,
+  "resonance_wavelength_um": 0.6365021755339165,
+  "q_factor": 12537.086780781054,
+  "decay_time_ps": 8.472780369063049,
+  "num_modes": 1
+}

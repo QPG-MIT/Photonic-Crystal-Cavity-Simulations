@@ -1,0 +1,240 @@
+================================================================================
+🔎 SCOUT STAGE — broadband resonance search
+================================================================================
+======================================================================
+🔧 SETTING UP GEOMETRY PARAMETERS
+======================================================================
+✓ Geometry parameters loaded
+  - Cavity thickness: 0.14 µm
+  - Wavelength: 0.65 µm
+  - Optimized padding: x=[-5.0, -5.0], y=[2.0, 2.0], z=[2.0, 2.0]
+
+🔬 Creating diamond medium...
+  - Using Sellmeier dispersion evaluated at λ=0.650 µm
+  - n(λ) = 2.410495 → ε = 5.810488
+  - Note: medium is set with ε(λ₀); full dispersion not invoked for narrowband run
+
+🚀 Creating minimal scout simulation (Q-only)...
+
+📐 Extracting geometry from GDS files...
+  - Using cell: TOP
+  - Original bbox: x[-15.675, 15.675], y[-0.150, 0.150]
+  - Geometry bbox: x[-15.675, 15.675], y[-0.150, 0.150]
+  - Simulation domain: left=-10.675, right=10.675, bottom=-2.150, top=2.150
+  - X truncation: 31.350 → 21.350 µm (reduced by 10.000 µm)
+  - Simulation size: (21.350, 4.300, 4.140) µm
+  - Simulation center: (0.000, 0.000, 0.000) µm
+
+🏗️  Creating core structure...
+  - Core rectangle created with 4 vertices
+  - Thickness: 0.14 µm
+
+🕳️  Creating hole structures...
+  - Using holes cell: Unnamed_48
+  - Imported 100 hole polygon(s)
+  - Created 1 hole structure(s)
+  - Thickness: 0.14 µm
+
+📡 Creating minimal source and Q-probe monitor...
+  - Created minimal monitor set: ['probe']
+✓ Minimal scout simulation created successfully
+  - Structures: 2
+  - Monitors: 1 (probe only)
+  - Run time: 12.0 ps
+
+💾 Saving simulation to simulation_scout_q_only_0.14um.json...
+✓ Simulation saved successfully
+  - File: simulation_scout_q_only_0.14um.json
+  - Size: 333.6 KB
+⚠️  Tidy3D web.configure/login failed: configure_fn() got an unexpected keyword argument 'api_key'
+
+🎯 RUNNING SIMULATION
+  - Task name: photonic_cavity_scout_0.14um
+  - Output path: results_scout_q_only_0.14um.hdf5
+  - Run time: 12.0 ps
+
+💰 ESTIMATING SIMULATION COST
+  - Task name: photonic_cavity_scout_0.14um
+  - Run time: 12.0 ps
+  - Size: (np.float64(21.35), np.float64(4.3), 4.14) µm
+  - Monitors: 1
+  - Calculating cost estimate...
+
+💳 ESTIMATED COST: 4.414 FlexCredits
+  - This is the maximum cost (if simulation runs full time)
+  - Actual cost may be lower if early shut-off is triggered
+
+⚠️  This simulation will cost approximately 4.414 FlexCredits!
+Do you want to proceed with the simulation? (y/N): 
+🚀 Running simulation...
+16:03:20 EDT Created task 'photonic_cavity_scout_0.14um' with task_id           
+             'fdve-95b04a56-137e-471b-b59e-fc7bff461aa2' and task_type 'FDTD'.  
+             View task using web UI at                                          
+             'https://tidy3d.simulation.cloud/workbench?taskId=fdve-95b04a56-137
+             e-471b-b59e-fc7bff461aa2'.                                         
+             Task folder: 'default'.                                            
+↑ simulation.hdf5.gz ━━━━━━━━━━━━━━━━━━━━━━━━━ 100.0% • 9.1/9.1 kB • ? • 0:00:00
+16:03:21 EDT Maximum FlexCredit cost: 4.414. Minimum cost depends on task       
+             execution details. Use 'web.real_cost(task_id)' to get the billed  
+             FlexCredit cost after a simulation run.                            
+16:03:22 EDT status = queued                                                    
+             To cancel the simulation, use 'web.abort(task_id)' or              
+             'web.delete(task_id)' or abort/delete the task in the web UI.      
+             Terminating the Python script will not stop the job running on the 
+             cloud.                                                             
+16:03:28 EDT status = preprocess                                                
+16:03:33 EDT starting up solver                                                 
+             running solver                                                     
+solver progress (field decay = 6.42e-03) ━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00
+16:14:53 EDT status = postprocess                                               
+16:14:55 EDT status = success                                                   
+16:14:57 EDT View simulation result at                                          
+             'https://tidy3d.simulation.cloud/workbench?taskId=fdve-95b04a56-137
+             e-471b-b59e-fc7bff461aa2'.                                         
+↓ simulation_data.hdf5.gz ━━━━━━━━━━━━ 100.0% • 4.9/4.9 MB • 12.2 MB/s • 0:00:00
+16:14:58 EDT loading simulation from results_scout_q_only_0.14um.hdf5           
+16:14:59 EDT WARNING: Simulation final field decay value of 0.00642 is greater  
+             than the simulation shutoff threshold of 1e-05. Consider running   
+             the simulation again with a larger 'run_time' duration for more    
+             accurate results.                                                  
+✓ Simulation completed successfully in 698.6 seconds!
+
+🔍 Validating simulation results...
+⚠️  Missing required monitors: ['flux', 'field_near']
+✓ Probe data: 87655 time points, 12.00 ps duration
+⚠️  No far-field monitors found
+✓ Results validation complete
+======================================================================
+🔬 Q-FACTOR RINGDOWN ANALYSIS (FFT-based)
+======================================================================
+✓ Extracted signal data
+  - Time points: 87655
+  - Duration: 12.00 ps
+  - Time step: 0.000 ps
+✓ Prepared analysis segment
+  - Tail start: peak+guard (index 226)
+  - Tail duration: 11.969 ps
+  - Tail points: 87429
+✓ Frequency estimation comparison:
+  - FFT estimate: 483.408408 THz
+  - Wavelength guess: 461.219166 THz
+  - Difference: 22.189241 THz
+  - Using: 483.408408 THz (FFT-based)
+✓ Extracted initial seeds
+  - Frequency seed: 483.424679 THz
+  - Decay rate seed: 1.356e+11 1/s
+  - Primary frequency: 483.408408 THz
+✓ Built search grids (improved span)
+  - Frequency grid: 121 points
+  - Decay rate grid: 81 points
+  - Grid span: ±5.0%
+✓ Single mode fit complete
+  - Frequency: 483.408408 THz
+  - Decay time: 7.249 ps
+  - Q-factor: 11,008
+  - Residual: 10.92%
+  - Coverage: 1.65 e-folds
+✓ Multi-mode analysis complete
+  - Effective modes: 1
+  - Grid residual: 10.92%
+✓ Variable projection refinement complete
+  - Mode 1: f=483.424680 THz, τ=7.376 ps, Q=11,203, coverage=1.62
+  - Final residual: 0.59%
+✓ Ringdown analysis plot saved to q_factor_analysis.png
+✓ Resonance located at 0.620143 µm (f₀ = 483.424680 THz)
+✓ Estimated quality factor Q = 11,203
+✓ Decay time τ ≈ 7.376 ps
+✓ Scout summary written to scout_summary_0.14um.json
+================================================================================
+🎯 LOCK-IN STAGE — narrowband analysis
+================================================================================
+Using lock-in wavelength 0.620143 µm (483.424680 THz)
+======================================================================
+🔧 SETTING UP GEOMETRY PARAMETERS
+======================================================================
+✓ Geometry parameters loaded
+  - Cavity thickness: 0.14 µm
+  - Wavelength: 0.620143055680523 µm
+  - Optimized padding: x=[-5.0, -5.0], y=[2.0, 2.0], z=[2.0, 2.0]
+
+🔬 Creating diamond medium...
+  - Using Sellmeier dispersion evaluated at λ=0.620 µm
+  - n(λ) = 2.413563 → ε = 5.825288
+  - Note: medium is set with ε(λ₀); full dispersion not invoked for narrowband run
+
+🚀 Creating complete simulation...
+
+📐 Extracting geometry from GDS files...
+  - Using cell: TOP
+  - Original bbox: x[-15.675, 15.675], y[-0.150, 0.150]
+  - Geometry bbox: x[-15.675, 15.675], y[-0.150, 0.150]
+  - Simulation domain: left=-10.675, right=10.675, bottom=-2.150, top=2.150
+  - X truncation: 31.350 → 21.350 µm (reduced by 10.000 µm)
+  - Simulation size: (21.350, 4.300, 4.140) µm
+  - Simulation center: (0.000, 0.000, 0.000) µm
+
+🏗️  Creating core structure...
+  - Core rectangle created with 4 vertices
+  - Thickness: 0.14 µm
+
+🕳️  Creating hole structures...
+  - Using holes cell: Unnamed_48
+  - Imported 100 hole polygon(s)
+  - Created 1 hole structure(s)
+  - Thickness: 0.14 µm
+
+📡 Creating sources and monitors...
+  - Source: Point dipole at (0.000, 0.000, 0.0)
+  - Frequency: 483.425 THz
+  - Bandwidth: 9.67 THz
+  - Created 3 basic monitors
+
+🌐 Creating improved far-field monitors...
+  - Positioning monitors at z = 1.5 µm
+  - Monitor size: 8.0 µm
+  - Created 3 improved far-field monitors
+✓ Complete simulation created successfully
+  - Structures: 2
+  - Monitors: 7
+  - Run time: 8.0 ps
+  - Grid: min_steps_per_wvl=18 with wavelength=0.620143055680523 µm
+  - Boundaries: PML(8 layers)
+
+💾 Saving simulation to simulation_lockin_full_0.14um.json...
+✓ Simulation saved successfully
+  - File: simulation_lockin_full_0.14um.json
+  - Size: 356.2 KB
+⚠️  Tidy3D web.configure/login failed: configure_fn() got an unexpected keyword argument 'api_key'
+
+🎯 RUNNING SIMULATION
+  - Task name: photonic_cavity_lockin_0.14um
+  - Output path: results_lockin_full_0.14um.hdf5
+  - Run time: 8.0 ps
+
+💰 ESTIMATING SIMULATION COST
+  - Task name: photonic_cavity_lockin_0.14um
+  - Run time: 8.0 ps
+  - Size: (np.float64(21.35), np.float64(4.3), 4.14) µm
+  - Monitors: 7
+  - Calculating cost estimate...
+
+💳 ESTIMATED COST: 3.569 FlexCredits
+  - This is the maximum cost (if simulation runs full time)
+  - Actual cost may be lower if early shut-off is triggered
+
+⚠️  This simulation will cost approximately 3.569 FlexCredits!
+Do you want to proceed with the simulation? (y/N): Simulation cancelled.
+❌ Mode volume analysis failed: [Errno 2] Unable to synchronously open file (unable to open file: name = 'results_lockin_full_0.14um.hdf5', errno = 2, error message = 'No such file or directory', flags = 0, o_flags = 0)
+❌ Polarization analysis failed: [Errno 2] Unable to synchronously open file (unable to open file: name = 'results_lockin_full_0.14um.hdf5', errno = 2, error message = 'No such file or directory', flags = 0, o_flags = 0)
+❌ Near-field analysis failed: [Errno 2] Unable to synchronously open file (unable to open file: name = 'results_lockin_full_0.14um.hdf5', errno = 2, error message = 'No such file or directory', flags = 0, o_flags = 0)
+❌ Far-field analysis failed: [Errno 2] Unable to synchronously open file (unable to open file: name = 'results_lockin_full_0.14um.hdf5', errno = 2, error message = 'No such file or directory', flags = 0, o_flags = 0)
+❌ Collection efficiency analysis failed: [Errno 2] Unable to synchronously open file (unable to open file: name = 'results_lockin_full_0.14um.hdf5', errno = 2, error message = 'No such file or directory', flags = 0, o_flags = 0)
+✓ Lock-in summary written to lockin_summary_0.14um.json
+
+================================================================================
+📋 WORKFLOW SUMMARY
+================================================================================
+Scout: λ₀ = 0.620143 µm, Q = 11,203
+Lock-in: λ = 0.620143 µm, Vₑff = n/a, Fp = n/a, η = n/a
+
+🏁 WORKFLOW COMPLETE
