@@ -18,9 +18,9 @@ This repository contains only the essential files needed to run the analysis:
 │   ├── simulation_runner.py
 │   └── simulation_setup.py
 ├── scripts/
-│   └── run_complete_analysis.py      # Main analysis script
+│   └── run_analysis.py               # Main analysis script
 ├── notebooks/
-│   └── Photonic_Cavity_Workflow.ipynb # Interactive analysis notebook
+│   └── analysis_notebook.ipynb       # Interactive analysis notebook
 ├── gds/                              # Diamond nanobeam cavity geometry files
 │   ├── Cavity.gds                    # Main nanobeam cavity structure
 │   └── Holes.gds                     # 1D photonic crystal holes
@@ -50,10 +50,10 @@ This repository contains only the essential files needed to run the analysis:
 3. **Run analysis:**
    ```bash
    # Command line (recommended for first run)
-   python scripts/run_complete_analysis.py
+   python scripts/run_analysis.py
    
    # Or interactive notebook
-   jupyter notebook notebooks/Photonic_Cavity_Workflow.ipynb
+   jupyter notebook notebooks/analysis_notebook.ipynb
    ```
 
 ## Analysis Workflow

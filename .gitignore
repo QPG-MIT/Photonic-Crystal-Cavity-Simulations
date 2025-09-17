@@ -18,11 +18,11 @@
 
 # Keep only the single script
 !scripts/
-!scripts/run_complete_analysis.py
+!scripts/run_analysis.py
 
 # Keep only the single notebook
 !notebooks/
-!notebooks/Photonic_Cavity_Workflow.ipynb
+!notebooks/analysis_notebook.ipynb
 
 # Keep all GDS files
 !gds/
@@ -44,9 +44,9 @@ logs/**
 
 # Do not keep other scripts or notebooks
 scripts/**
-!/scripts/run_complete_analysis.py
+!/scripts/run_analysis.py
 notebooks/**
-!/notebooks/Photonic_Cavity_Workflow.ipynb
+!/notebooks/analysis_notebook.ipynb
 
 # Python/build artifacts
 __pycache__/**
