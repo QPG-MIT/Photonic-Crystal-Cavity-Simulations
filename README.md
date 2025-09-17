@@ -25,9 +25,9 @@ This repository contains only the essential files needed to run the analysis:
 │   ├── Cavity.gds                    # Main nanobeam cavity structure
 │   └── Holes.gds                     # 1D photonic crystal holes
 ├── data/
-│   └── results/                      # Sample results
-│       ├── results_lockin_full_0.19um.hdf5
-│       └── results_scout_q_only_0.19um.hdf5
+│   ├── results/                      # Simulation results (HDF5 files)
+│   ├── simulations/                  # Simulation configuration files (JSON)
+│   └── summaries/                    # Analysis summaries
 ├── requirements.txt                  # Python dependencies
 └── README.md
 ```
@@ -42,9 +42,18 @@ This repository contains only the essential files needed to run the analysis:
 
 2. **Set up environment:**
    ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   # Create virtual environment in a parallel directory (outside the project)
+   cd ..
+   python -m venv photonic-cavity-env
+   source photonic-cavity-env/bin/activate  # On Windows: photonic-cavity-env\Scripts\activate
+   cd Photonic-Crystal-Cavity-Simulations
    pip install -r requirements.txt
+   ```
+
+   **For future sessions**, activate the environment from the project directory:
+   ```bash
+   # From the project root directory
+   source ../photonic-cavity-env/bin/activate  # On Windows: ..\photonic-cavity-env\Scripts\activate
    ```
 
 3. **Run analysis:**
@@ -112,3 +121,4 @@ See `requirements.txt` for the complete dependency list.
 - Large result files (>100 MB) are excluded from the repository but generated locally during analysis
 - Nanobeam 1D photonic crystal cavities are designed for tin vacancy (SnV) defect integration in diamond
 - Fabrication uses microtransfer printing of silicon hard masks for precise patterning
+- Virtual environment is created in a parallel directory to keep the project directory clean
