@@ -4,33 +4,57 @@
 # Keep this file
 !.gitignore
 
-# Keep core code and files
-!modules/
-!modules/*.py
-!scripts/
-!scripts/*.py
-!gds/
-!gds/*.gds
-!data/
-!data/simulations/
-!data/summaries/
-data/results/*.hdf5
-!data/results/*0.19*.hdf5
-!notebooks/
-!figures/
-!logs/
-!Cavity.gds
-!Holes.gds
-!requirements.txt
+############################################
+# Strict allow-list for GitHub repository  #
+############################################
+
+# Essentials
 !README.md
-!run_complete_analysis.py
+!requirements.txt
+
+# Keep modules (all)
+!modules/
+!modules/**
+
+# Keep only the single script
+!scripts/
+!scripts/run_complete_analysis.py
+
+# Keep only the single notebook
+!notebooks/
 !notebooks/Photonic_Cavity_Workflow.ipynb
 
-# Keep ONLY 0.19 µm results
-!*0.19*.hdf5
-!*0.19*.json
+# Keep all GDS files
+!gds/
+!gds/**
 
-# Always ignore caches/compiled files
-modules/__pycache__/
-__pycache__/
+# Keep only 0.19 µm results under data/results
+!data/
+!data/results/
+!data/results/*0.19*.hdf5
+
+# Explicitly ignore everything else inside data
+/data/**
+!/data/results/
+!/data/results/*0.19*.hdf5
+
+# Ignore figures and logs entirely
+figures/**
+logs/**
+
+# Do not keep other scripts or notebooks
+scripts/**
+!/scripts/run_complete_analysis.py
+notebooks/**
+!/notebooks/Photonic_Cavity_Workflow.ipynb
+
+# Python/build artifacts
+__pycache__/**
 *.pyc
+*.pyo
+*.pyd
+*.egg-info/**
+.build/**
+build/**
+dist/**
+.DS_Store
