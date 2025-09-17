@@ -1,62 +1,112 @@
-# Photonic Cavity Analysis
+# Photonic Crystal Cavity Simulations
 
-This repository contains a complete photonic cavity analysis workflow for silicon hard mask simulations.
+A complete photonic cavity analysis workflow for silicon hard mask simulations using Tidy3D FDTD solver.
 
-## Project Structure
+## Repository Structure
 
-- `modules/` - Analysis modules for different aspects of photonic cavity characterization
-- `*.gds` - GDSII files containing the cavity and hole geometries
-- `*.ipynb` - Jupyter notebooks for interactive analysis
-- `results_*.hdf5` - Simulation results in HDF5 format
-- `run_complete_analysis.py` - Script to run the complete analysis workflow
+This repository contains only the essential files needed to run the analysis:
 
-## Setup
+```
+├── modules/                          # Analysis modules
+│   ├── collection_efficiency_analysis.py
+│   ├── farfield_analysis.py
+│   ├── mode_volume_analysis.py
+│   ├── nearfield_analysis.py
+│   ├── plot_style.py
+│   ├── polarization_analysis.py
+│   ├── q_factor_analysis.py
+│   ├── simulation_runner.py
+│   └── simulation_setup.py
+├── scripts/
+│   └── run_complete_analysis.py      # Main analysis script
+├── notebooks/
+│   └── Photonic_Cavity_Workflow.ipynb # Interactive analysis notebook
+├── gds/                              # Device geometry files
+│   ├── Cavity.gds
+│   └── Holes.gds
+├── data/
+│   └── results/                      # Sample results (0.19µm only)
+│       ├── results_lockin_full_0.19um.hdf5
+│       └── results_scout_q_only_0.19um.hdf5
+├── requirements.txt                  # Python dependencies
+└── README.md
+```
 
-1. Create a virtual environment:
+## Quick Start
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/abuzzimit/Photonic-Crystal-Cavity-Simulations.git
+   cd Photonic-Crystal-Cavity-Simulations
+   ```
+
+2. **Set up environment:**
    ```bash
    python -m venv .venv
    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   ```
-
-2. Install dependencies:
-   ```bash
    pip install -r requirements.txt
    ```
 
-## Usage
+3. **Run analysis:**
+   ```bash
+   # Command line (recommended for first run)
+   python scripts/run_complete_analysis.py
+   
+   # Or interactive notebook
+   jupyter notebook notebooks/Photonic_Cavity_Workflow.ipynb
+   ```
 
-### Interactive Analysis
-Open the Jupyter notebooks for interactive analysis:
-- `Photonic_Cavity_Analysis.ipynb` - Basic analysis
-- `Photonic_Cavity_Analysis_Complete.ipynb` - Complete analysis workflow
+## Analysis Workflow
 
-### Command Line Analysis
-Run the complete analysis from the command line:
-```bash
-python run_complete_analysis.py
-```
+The analysis consists of two main stages:
+
+### 1. Scout Stage
+- **Purpose**: Find cavity resonance wavelength
+- **Output**: `data/results/results_scout_q_only_*.hdf5`
+- **Analysis**: Q-factor calculation and resonance identification
+
+### 2. Lock-in Stage  
+- **Purpose**: Detailed analysis at resonance
+- **Output**: `data/results/results_lockin_full_*.hdf5`
+- **Analysis**: Mode volume, polarization, near-field, far-field, collection efficiency
 
 ## Analysis Modules
 
-The `modules/` directory contains specialized analysis modules:
+| Module | Purpose |
+|--------|---------|
+| `simulation_setup.py` | Tidy3D simulation configuration and geometry loading |
+| `simulation_runner.py` | Simulation execution and result management |
+| `q_factor_analysis.py` | Quality factor calculation from frequency domain data |
+| `mode_volume_analysis.py` | Mode volume and Purcell factor calculations |
+| `polarization_analysis.py` | Far-field polarization analysis |
+| `nearfield_analysis.py` | Near-field intensity and field analysis |
+| `farfield_analysis.py` | Far-field radiation pattern analysis |
+| `collection_efficiency_analysis.py` | Collection efficiency vs numerical aperture |
 
-- `q_factor_analysis.py` - Quality factor analysis
-- `mode_volume_analysis.py` - Mode volume calculations
-- `polarization_analysis.py` - Polarization analysis
-- `nearfield_analysis.py` - Near-field analysis
-- `farfield_analysis.py` - Far-field analysis
-- `collection_efficiency_analysis.py` - Collection efficiency calculations
-- `simulation_runner.py` - Simulation execution
-- `simulation_setup.py` - Simulation configuration
+## Output Structure
 
-## Dependencies
+When you run the analysis, the following directories will be created:
 
-Key dependencies include:
-- `tidy3d` - FDTD simulation engine
-- `gdsfactory` - GDSII file handling
-- `numpy`, `scipy` - Numerical computing
-- `matplotlib` - Plotting
-- `h5py` - HDF5 file handling
-- `jupyter` - Interactive notebooks
+- `data/simulations/` - Simulation configuration files
+- `data/results/` - HDF5 simulation results
+- `data/summaries/` - JSON analysis summaries
+- `figures/` - Generated plots and visualizations
+- `logs/` - Analysis logs
 
-See `requirements.txt` for the complete list of dependencies.
+## Key Dependencies
+
+- **`tidy3d`** - FDTD simulation engine
+- **`gdstk`** - GDSII file handling
+- **`numpy`, `scipy`** - Numerical computing
+- **`matplotlib`** - Plotting and visualization
+- **`h5py`** - HDF5 file I/O
+- **`jupyter`** - Interactive notebooks
+
+See `requirements.txt` for the complete dependency list.
+
+## Notes
+
+- The repository contains sample results for 0.19µm cavity size
+- All file paths are resolved relative to the repository root
+- The analysis can be run from any directory within the repository
+- Large result files (>100MB) are excluded from the repository but generated locally during analysis
