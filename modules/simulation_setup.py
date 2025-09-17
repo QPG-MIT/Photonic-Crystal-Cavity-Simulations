@@ -102,8 +102,8 @@ class SimulationSetup:
         }
     
     def _create_diamond_medium(self) -> Tuple[td.Medium, td.Medium, float]:
-        """Create diamond medium using Sellmeier dispersion evaluated at λ."""
-        print("\n🔬 Creating diamond medium...")
+        """Create diamond medium using full Sellmeier dispersion model."""
+        print("\n🔬 Creating diamond medium with full Sellmeier dispersion...")
 
         def n_diamond_sellmeier(lambda_um: float) -> float:
             """Sellmeier model for diamond (λ in µm).
@@ -118,14 +118,22 @@ class SimulationSetup:
             n2 = 1.0 + B1 * lam2 / (lam2 - C1) + B2 * lam2 / (lam2 - C2)
             return float(np.sqrt(n2))
 
-        n_diamond = n_diamond_sellmeier(self.wavelength_um)
+        # Calculate refractive index at the analysis wavelength for reference
+        n_diamond_ref = n_diamond_sellmeier(self.wavelength_um)
 
-        print(f"  - Using Sellmeier dispersion evaluated at λ={self.wavelength_um:.3f} µm")
-        print(f"  - n(λ) = {n_diamond:.6f} → ε = {n_diamond**2:.6f}")
-        print(f"  - Note: medium is set with ε(λ0); full dispersion not invoked for narrowband run")
+        print(f"  - Using full Sellmeier dispersion model")
+        print(f"  - Coefficients: B1=0.3306, C1=0.175²; B2=4.3356, C2=0.106²")
+        print(f"  - Reference n(λ={self.wavelength_um:.3f} µm) = {n_diamond_ref:.6f}")
+        print(f"  - Full frequency-dependent dispersion enabled for FDTD simulation")
 
-        # Create media
-        diamond_medium = td.Medium(permittivity=n_diamond**2)
+        # Create Sellmeier medium with proper coefficients
+        # Note: Tidy3D expects coefficients in the format [(B1, C1), (B2, C2), ...]
+        sellmeier_coeffs = [
+            (0.3306, 0.175**2),  # (B1, C1)
+            (4.3356, 0.106**2)   # (B2, C2)
+        ]
+        
+        diamond_medium = td.Sellmeier(coeffs=sellmeier_coeffs)
         clad_medium = td.Medium(permittivity=1.0)
 
         # Calculate center frequency

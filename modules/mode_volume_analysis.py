@@ -35,11 +35,15 @@ def _sellmeier_diamond(wavelength_um: float) -> float:
     """
     Calculate refractive index of diamond using a two-term Sellmeier equation.
     Wavelength must be in micrometers.
+    
+    This function uses the same coefficients as the Tidy3D Sellmeier medium
+    for consistency between simulation and post-processing analysis.
+    
     Ref: A. M. Zaitsev, "Optical Properties of Diamond: A Review,"
          Phys. Status Solidi A 172, 15 (1999). (Table 1, natural diamond)
     """
     lambda_sq_um = wavelength_um**2
-    # Sellmeier coefficients for natural diamond (matching simulation_setup.py)
+    # Sellmeier coefficients for natural diamond (matching Tidy3D Sellmeier medium)
     B1, C1 = 0.3306, 0.175**2
     B2, C2 = 4.3356, 0.106**2
 
@@ -59,7 +63,7 @@ class ModeVolumeAnalyzer:
                  wavelength_um: float = 0.62,
                  hole_layer: int = 0,
                  hole_dtype: int = 0,
-                 n_core: float = 2.414,
+                 n_core: Optional[float] = None,
                  n_clad: float = 1.0):
         """
         Initialize mode volume analyzer.
@@ -71,7 +75,7 @@ class ModeVolumeAnalyzer:
             wavelength_um: Analysis wavelength in micrometers
             hole_layer: GDS layer for holes
             hole_dtype: GDS datatype for holes
-            n_core: Core refractive index
+            n_core: Core refractive index (if None, uses Sellmeier equation)
             n_clad: Cladding refractive index
         """
         self.cavity_gds = Path(cavity_gds)
@@ -86,7 +90,13 @@ class ModeVolumeAnalyzer:
         self.wavelength_um = wavelength_um
         self.hole_layer = hole_layer
         self.hole_dtype = hole_dtype
-        self.n_core = n_core
+        # Use Sellmeier equation if n_core not specified
+        if n_core is None:
+            self.n_core = _sellmeier_diamond(wavelength_um)
+            print(f"  - Using Sellmeier equation for diamond: n(λ={wavelength_um:.3f} µm) = {self.n_core:.6f}")
+        else:
+            self.n_core = n_core
+            print(f"  - Using provided refractive index: n = {self.n_core:.6f}")
         self.n_clad = n_clad
         
     def load_field_data(self, data: td.SimulationData, 
