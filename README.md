@@ -106,9 +106,9 @@ See `requirements.txt` for the complete dependency list.
 
 ## Notes
 
-- The repository contains sample results for 0.19µm diamond nanobeam cavity size
+- The repository contains sample results for 0.19 µm diamond nanobeam cavity size
 - All file paths are resolved relative to the repository root
 - The analysis can be run from any directory within the repository
-- Large result files (>100MB) are excluded from the repository but generated locally during analysis
+- Large result files (>100 MB) are excluded from the repository but generated locally during analysis
 - Nanobeam 1D photonic crystal cavities are designed for tin vacancy (SnV) defect integration in diamond
 - Fabrication uses microtransfer printing of silicon hard masks for precise patterning
