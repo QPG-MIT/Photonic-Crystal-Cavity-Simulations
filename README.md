@@ -1,6 +1,6 @@
-# Photonic Crystal Cavity Simulations
+# Diamond Nanobeam Photonic Crystal Cavity Simulations
 
-A complete photonic cavity analysis workflow for silicon hard mask simulations using Tidy3D FDTD solver.
+A complete photonic cavity analysis workflow for diamond nanobeam 1D photonic crystal cavities designed for tin vacancy (SnV) defects, fabricated using microtransfer printing of silicon hard masks. Simulations performed using Tidy3D FDTD solver.
 
 ## Repository Structure
 
@@ -21,11 +21,11 @@ This repository contains only the essential files needed to run the analysis:
 │   └── run_complete_analysis.py      # Main analysis script
 ├── notebooks/
 │   └── Photonic_Cavity_Workflow.ipynb # Interactive analysis notebook
-├── gds/                              # Device geometry files
-│   ├── Cavity.gds
-│   └── Holes.gds
+├── gds/                              # Diamond nanobeam cavity geometry files
+│   ├── Cavity.gds                    # Main nanobeam cavity structure
+│   └── Holes.gds                     # 1D photonic crystal holes
 ├── data/
-│   └── results/                      # Sample results (0.19µm only)
+│   └── results/                      # Sample results
 │       ├── results_lockin_full_0.19um.hdf5
 │       └── results_scout_q_only_0.19um.hdf5
 ├── requirements.txt                  # Python dependencies
@@ -58,30 +58,30 @@ This repository contains only the essential files needed to run the analysis:
 
 ## Analysis Workflow
 
-The analysis consists of two main stages:
+The analysis consists of two main stages for characterizing diamond nanobeam 1D photonic crystal cavities:
 
 ### 1. Scout Stage
-- **Purpose**: Find cavity resonance wavelength
+- **Purpose**: Find cavity resonance wavelength for SnV defect coupling
 - **Output**: `data/results/results_scout_q_only_*.hdf5`
-- **Analysis**: Q-factor calculation and resonance identification
+- **Analysis**: Q-factor calculation and resonance identification in diamond
 
 ### 2. Lock-in Stage  
-- **Purpose**: Detailed analysis at resonance
+- **Purpose**: Detailed analysis at resonance for quantum applications
 - **Output**: `data/results/results_lockin_full_*.hdf5`
-- **Analysis**: Mode volume, polarization, near-field, far-field, collection efficiency
+- **Analysis**: Mode volume, polarization, near-field, far-field, collection efficiency for SnV integration
 
 ## Analysis Modules
 
 | Module | Purpose |
 |--------|---------|
-| `simulation_setup.py` | Tidy3D simulation configuration and geometry loading |
+| `simulation_setup.py` | Tidy3D simulation configuration and diamond nanobeam cavity geometry loading |
 | `simulation_runner.py` | Simulation execution and result management |
-| `q_factor_analysis.py` | Quality factor calculation from frequency domain data |
-| `mode_volume_analysis.py` | Mode volume and Purcell factor calculations |
-| `polarization_analysis.py` | Far-field polarization analysis |
-| `nearfield_analysis.py` | Near-field intensity and field analysis |
+| `q_factor_analysis.py` | Quality factor calculation for diamond cavity resonances |
+| `mode_volume_analysis.py` | Mode volume and Purcell factor calculations for SnV coupling |
+| `polarization_analysis.py` | Far-field polarization analysis for quantum applications |
+| `nearfield_analysis.py` | Near-field intensity and field analysis in diamond |
 | `farfield_analysis.py` | Far-field radiation pattern analysis |
-| `collection_efficiency_analysis.py` | Collection efficiency vs numerical aperture |
+| `collection_efficiency_analysis.py` | Collection efficiency vs numerical aperture for SnV emission |
 
 ## Output Structure
 
@@ -106,7 +106,9 @@ See `requirements.txt` for the complete dependency list.
 
 ## Notes
 
-- The repository contains sample results for 0.19µm cavity size
+- The repository contains sample results for 0.19µm diamond nanobeam cavity size
 - All file paths are resolved relative to the repository root
 - The analysis can be run from any directory within the repository
 - Large result files (>100MB) are excluded from the repository but generated locally during analysis
+- Nanobeam 1D photonic crystal cavities are designed for tin vacancy (SnV) defect integration in diamond
+- Fabrication uses microtransfer printing of silicon hard masks for precise patterning
