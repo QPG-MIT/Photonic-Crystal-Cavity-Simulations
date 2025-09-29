@@ -27,9 +27,11 @@ gds/correct_gds.py
 !notebooks/
 !notebooks/analysis_notebook.ipynb
 
-# Keep all GDS files
+# Keep all GDS files, then re-ignore helper scripts
 !gds/
 !gds/**
+# Re-ignore Python utilities inside gds (ordering matters)
+gds/*.py
 
 # Keep only 0.19 µm results under data/results
 !data/
