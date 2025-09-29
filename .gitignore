@@ -1,3 +1,6 @@
+# Ignore local GDS correction script
+gds/correct_gds.py
+
 # Ignore everything
 /*
 
