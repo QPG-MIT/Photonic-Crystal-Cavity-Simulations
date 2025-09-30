@@ -344,12 +344,16 @@ def run_lockin_stage(config: WorkflowConfig, resonance_summary: Dict[str, Any]) 
     lockin_frequency_thz = C0 / (lockin_wavelength * 1e-6) / 1e12
     print(f"Using lock-in wavelength {lockin_wavelength:.6f} µm ({lockin_frequency_thz:.6f} THz)")
 
+    # Resolve GDS inputs once and pass through explicitly
+    cavity_gds = getattr(config, 'cavity_gds', None)
+    holes_gds = getattr(config, 'holes_gds', None)
+
     setup = SimulationSetup(
         thickness_um=config.thickness_um,
         wavelength_um=lockin_wavelength,
         source_bandwidth_rel=stage.bandwidth_rel,
-        cavity_gds=getattr(config, 'cavity_gds', None),
-        holes_gds=getattr(config, 'holes_gds', None),
+        cavity_gds=cavity_gds,
+        holes_gds=holes_gds,
     )
     simulation = setup.create_simulation(run_time_ps=stage.run_time_ps)
     setup.save_simulation(simulation, str(stage.simulation_path))
@@ -400,8 +404,8 @@ def run_lockin_stage(config: WorkflowConfig, resonance_summary: Dict[str, Any]) 
     try:
         mv_results = analyze_mode_volume(
             data_path=str(stage.results_path),
-            cavity_gds=(getattr(config, 'cavity_gds', None) or "gds/Cavity_Design.gds"),
-            holes_gds=(getattr(config, 'holes_gds', None) or "gds/Holes_Design.gds"),
+            cavity_gds=cavity_gds,
+            holes_gds=holes_gds,
             thickness_um=config.thickness_um,
             wavelength_um=lockin_wavelength,
             Q=q_for_lockin,
@@ -444,8 +448,8 @@ def run_lockin_stage(config: WorkflowConfig, resonance_summary: Dict[str, Any]) 
             data_path=str(stage.results_path),
             monitor_name="field_near",
             wavelength_um=lockin_wavelength,
-            cavity_gds=(getattr(config, 'cavity_gds', None) or "gds/Cavity_Design.gds"),
-            holes_gds=(getattr(config, 'holes_gds', None) or "gds/Holes_Design.gds"),
+            cavity_gds=cavity_gds,
+            holes_gds=holes_gds,
             save_results=True,
             create_plots=True,
         )
@@ -568,7 +572,9 @@ def run_complete_analysis(config: Optional[WorkflowConfig] = None) -> Dict[str, 
 def parse_args(argv: Optional[list] = None) -> argparse.Namespace:
     """Parse command-line arguments."""
 
-    thickness_um = 0.19 # default thickness
+    thickness_um = 0.182 # default thickness
+    cavity_gds = "gds/Cavity_Fab.gds"
+    holes_gds = "gds/Holes_Fab.gds"
 
     parser = argparse.ArgumentParser(
         description="Run the two-pass photonic cavity analysis workflow.",
@@ -604,8 +610,8 @@ def parse_args(argv: Optional[list] = None) -> argparse.Namespace:
     parser.add_argument("--lockin-sim", type=str, help="Output path for the lock-in simulation JSON file.")
     parser.add_argument("--scout-summary", type=str, help="Output path for the scout summary JSON file.")
     parser.add_argument("--lockin-summary", type=str, help="Output path for the lock-in summary JSON file.")
-    parser.add_argument("--cavity-gds", type=str, default=None, help="Cavity GDS file name or path (e.g., Cavity_Design.gds)")
-    parser.add_argument("--holes-gds", type=str, default=None, help="Holes GDS file name or path (e.g., Holes_Design.gds)")
+    parser.add_argument("--cavity-gds", type=str, default=cavity_gds, help="Cavity GDS file name or path (e.g., Cavity_Design.gds)")
+    parser.add_argument("--holes-gds", type=str, default=holes_gds, help="Holes GDS file name or path (e.g., Holes_Design.gds)")
     parser.add_argument(
         "--run-sims",
         action="store_true",
