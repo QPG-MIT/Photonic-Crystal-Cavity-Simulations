@@ -39,7 +39,9 @@ class SimulationSetup:
     def __init__(self,
                  thickness_um: float = 0.14,
                  wavelength_um: float = 0.62,
-                 source_bandwidth_rel: float = 0.12):
+                 source_bandwidth_rel: float = 0.12,
+                 cavity_gds: Optional[str] = None,
+                 holes_gds: Optional[str] = None):
         """
         Initialize simulation setup parameters.
 
@@ -51,6 +53,9 @@ class SimulationSetup:
         self.thickness_um = thickness_um
         self.wavelength_um = wavelength_um
         self.source_bandwidth_rel = source_bandwidth_rel
+        # Store optional GDS filenames/paths (can be names like "Cavity_Design.gds")
+        self._cavity_gds_input = cavity_gds
+        self._holes_gds_input = holes_gds
         self.params = self._setup_geometry_parameters()
         self.diamond_medium, self.clad_medium, self.f0_center = self._create_diamond_medium()
         
@@ -62,8 +67,20 @@ class SimulationSetup:
         
         # File paths (resolve relative to repository root so notebooks/scripts work)
         repo_root = Path(__file__).resolve().parents[1]
-        gds_path = (repo_root / "gds" / "Cavity.gds").resolve()
-        hole_gds_path = (repo_root / "gds" / "Holes.gds").resolve()
+        # Determine cavity GDS path
+        if self._cavity_gds_input:
+            cav_candidate = Path(self._cavity_gds_input)
+            gds_path = cav_candidate if cav_candidate.is_absolute() else (repo_root / "gds" / cav_candidate.name)
+            gds_path = gds_path.resolve()
+        else:
+            gds_path = (repo_root / "gds" / "Cavity_Design.gds").resolve()
+        # Determine holes GDS path
+        if self._holes_gds_input:
+            hol_candidate = Path(self._holes_gds_input)
+            hole_gds_path = hol_candidate if hol_candidate.is_absolute() else (repo_root / "gds" / hol_candidate.name)
+            hole_gds_path = hole_gds_path.resolve()
+        else:
+            hole_gds_path = (repo_root / "gds" / "Holes_Design.gds").resolve()
         
         # Improved padding - keep negative X padding to avoid spurious scattering
         pad_x_neg = -5.0   # left side (negative to avoid waveguide scattering)

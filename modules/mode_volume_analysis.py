@@ -57,8 +57,8 @@ class ModeVolumeAnalyzer:
     """
     
     def __init__(self, 
-                 cavity_gds: str = "gds/Cavity.gds",
-                 holes_gds: str = "gds/Holes.gds",
+                 cavity_gds: str = "gds/Cavity_Design.gds",
+                 holes_gds: str = "gds/Holes_Design.gds",
                  thickness_um: float = 0.14,
                  wavelength_um: float = 0.62,
                  hole_layer: int = 0,
@@ -80,12 +80,38 @@ class ModeVolumeAnalyzer:
         """
         self.cavity_gds = Path(cavity_gds)
         self.holes_gds = Path(holes_gds)
-        # Resolve relative paths to repo root so notebooks/scripts work consistently
+        # Resolve relative paths robustly: bare filenames -> repo_root/gds/<name>
         repo_root = Path(__file__).resolve().parents[1]
         if not self.cavity_gds.is_absolute():
-            self.cavity_gds = (repo_root / self.cavity_gds).resolve()
+            cav_base = self.cavity_gds.name if self.cavity_gds.parent == Path('.') or str(self.cavity_gds.parent) == '' else str(self.cavity_gds)
+            cav_path = (repo_root / 'gds' / cav_base) if Path(cav_base).name == cav_base else (repo_root / cav_base)
+            cav_path = cav_path.resolve()
+        else:
+            cav_path = self.cavity_gds
+        # Fallbacks for legacy/alt filenames
+        if not cav_path.exists():
+            candidates = [
+                repo_root / 'gds' / 'Cavity_Design.gds',
+                repo_root / 'gds' / 'Cavity_Fab.gds',
+                repo_root / 'gds' / 'Cavity.gds',
+            ]
+            cav_path = next((p.resolve() for p in candidates if p.exists()), cav_path)
+        self.cavity_gds = cav_path
+
         if not self.holes_gds.is_absolute():
-            self.holes_gds = (repo_root / self.holes_gds).resolve()
+            hol_base = self.holes_gds.name if self.holes_gds.parent == Path('.') or str(self.holes_gds.parent) == '' else str(self.holes_gds)
+            hol_path = (repo_root / 'gds' / hol_base) if Path(hol_base).name == hol_base else (repo_root / hol_base)
+            hol_path = hol_path.resolve()
+        else:
+            hol_path = self.holes_gds
+        if not hol_path.exists():
+            hol_candidates = [
+                repo_root / 'gds' / 'Holes_Design.gds',
+                repo_root / 'gds' / 'Holes_Fab.gds',
+                repo_root / 'gds' / 'Holes.gds',
+            ]
+            hol_path = next((p.resolve() for p in hol_candidates if p.exists()), hol_path)
+        self.holes_gds = hol_path
         self.thickness_um = thickness_um
         self.wavelength_um = wavelength_um
         self.hole_layer = hole_layer
@@ -270,7 +296,7 @@ class ModeVolumeAnalyzer:
         
         dV = dx * dy * dz  # Volume element in µm³
         
-        print(f"  - Volume element: {dV*1e18:.3f} µm³")
+        print(f"  - Volume element: {dV:.6f} µm³")
         
         # Compute |E|² weighted by permittivity
         E_squared = np.abs(Ex)**2 + np.abs(Ey)**2 + np.abs(Ez)**2
@@ -371,9 +397,9 @@ class ModeVolumeAnalyzer:
             'thickness_um': self.thickness_um,
             'field_shape': Ex.shape,
             'coordinate_ranges': {
-                'x_um': [x.min()*1e6, x.max()*1e6],
-                'y_um': [y.min()*1e6, y.max()*1e6],
-                'z_um': [z.min()*1e6, z.max()*1e6]
+                'x_um': [x.min(), x.max()],
+                'y_um': [y.min(), y.max()],
+                'z_um': [z.min(), z.max()]
             }
         }
         
@@ -409,44 +435,41 @@ class ModeVolumeAnalyzer:
         vmin_linear = np.percentile(E_squared, 0.01)
         vmax_linear = np.percentile(E_squared, 99.99)
         
-        # Field intensity plots
+        # Field intensity plots (use pcolormesh with 1D axes to preserve scaling)
         # XY plane (z=0) - Top view
-        im1 = axes[0].imshow(E_squared[k_center, :, :], 
-                            extent=[x.min()*1e6, x.max()*1e6, y.min()*1e6, y.max()*1e6],
-                            origin='lower', cmap=mono_cmap, aspect='auto', alpha=1,
-                            vmin=vmin_linear, vmax=vmax_linear)
+        E_xy = E_squared[k_center, :, :]  # (Ny, Nx)
+        im1 = axes[0].pcolormesh(x, y, E_xy, shading="auto", cmap=mono_cmap,
+                                 vmin=vmin_linear, vmax=vmax_linear)
         axes[0].set_title('Top View (XY plane)', fontsize=14, fontweight='bold')
         axes[0].set_xlabel('x (µm)')
         axes[0].set_ylabel('y (µm)')
-        axes[0].grid(False)  # Remove grid
+        axes[0].grid(False)
         plt.colorbar(im1, ax=axes[0], label='|E|²')
         
         # Add structure outline for XY plane using permittivity map
         self._add_structure_outline_xy(axes[0], eps[k_center, :, :], x, y)
         
         # XZ plane (y=0) - Side view
-        im2 = axes[1].imshow(E_squared[:, j_center, :], 
-                            extent=[x.min()*1e6, x.max()*1e6, z.min()*1e6, z.max()*1e6],
-                            origin='lower', cmap=mono_cmap, aspect='auto', alpha=1,
-                            vmin=vmin_linear, vmax=vmax_linear)
+        E_xz = E_squared[:, j_center, :]  # (Nz, Nx)
+        im2 = axes[1].pcolormesh(x, z, E_xz, shading="auto", cmap=mono_cmap,
+                                 vmin=vmin_linear, vmax=vmax_linear)
         axes[1].set_title('Side View (XZ plane)', fontsize=14, fontweight='bold')
         axes[1].set_xlabel('x (µm)')
         axes[1].set_ylabel('z (µm)')
-        axes[1].grid(False)  # Remove grid
+        axes[1].grid(False)
         plt.colorbar(im2, ax=axes[1], label='|E|²')
         
         # Add structure outline for XZ plane
         self._add_structure_outline_xz(axes[1], eps[:, j_center, :], x, z)
         
         # YZ plane (x=0) - Front view
-        im3 = axes[2].imshow(E_squared[:, :, i_center], 
-                            extent=[y.min()*1e6, y.max()*1e6, z.min()*1e6, z.max()*1e6],
-                            origin='lower', cmap=mono_cmap, aspect='auto', alpha=1,
-                            vmin=vmin_linear, vmax=vmax_linear)
+        E_yz = E_squared[:, :, i_center]  # (Nz, Ny)
+        im3 = axes[2].pcolormesh(y, z, E_yz, shading="auto", cmap=mono_cmap,
+                                 vmin=vmin_linear, vmax=vmax_linear)
         axes[2].set_title('Front View (YZ plane)', fontsize=14, fontweight='bold')
         axes[2].set_xlabel('y (µm)')
         axes[2].set_ylabel('z (µm)')
-        axes[2].grid(False)  # Remove grid
+        axes[2].grid(False)
         plt.colorbar(im3, ax=axes[2], label='|E|²')
         
         # Add structure outline for YZ plane
@@ -485,9 +508,9 @@ class ModeVolumeAnalyzer:
                     avg_eps = np.mean(eps_slice[contour[:, 0].astype(int), contour[:, 1].astype(int)])
                     
                     if avg_eps > eps_threshold * 1.2:  # Cavity
-                        ax.plot(x_coords*1e6, y_coords*1e6, 'w-', linewidth=2, alpha=1)
+                        ax.plot(x_coords, y_coords, 'w-', linewidth=2, alpha=1)
                     else:  # Hole
-                        ax.plot(x_coords*1e6, y_coords*1e6, 'w-', linewidth=1, alpha=1)
+                        ax.plot(x_coords, y_coords, 'w-', linewidth=1, alpha=1)
         except Exception as e:
             print(f"Warning: Could not add structure outline to XY plane: {e}")
     
@@ -507,7 +530,7 @@ class ModeVolumeAnalyzer:
                     x_coords = x[contour[:, 1].astype(int)]
                     
                     # For XZ plane, we plot the top and bottom boundaries
-                    ax.plot(x_coords*1e6, z_coords*1e6, 'w-', linewidth=2, alpha=1)
+                    ax.plot(x_coords, z_coords, 'w-', linewidth=2, alpha=1)
         except Exception as e:
             print(f"Warning: Could not add structure outline to XZ plane: {e}")
     
@@ -527,7 +550,7 @@ class ModeVolumeAnalyzer:
                     y_coords = y[contour[:, 1].astype(int)]
                     
                     # For YZ plane, we plot the top and bottom boundaries
-                    ax.plot(y_coords*1e6, z_coords*1e6, 'w-', linewidth=2, alpha=1)
+                    ax.plot(y_coords, z_coords, 'w-', linewidth=2, alpha=1)
         except Exception as e:
             print(f"Warning: Could not add structure outline to YZ plane: {e}")
     
@@ -547,8 +570,8 @@ class ModeVolumeAnalyzer:
 
 
 def analyze_mode_volume(data_path: str,
-                       cavity_gds: str = "gds/Cavity.gds",
-                       holes_gds: str = "gds/Holes.gds",
+                       cavity_gds: str = "gds/Cavity_Design.gds",
+                       holes_gds: str = "gds/Holes_Design.gds",
                        thickness_um: float = 0.14,
                        wavelength_um: float = 0.62,
                        monitor_name: str = "fld_3d_box",

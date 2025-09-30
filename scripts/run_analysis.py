@@ -73,6 +73,8 @@ class WorkflowConfig:
     resonance_wavelength_um: Optional[float] = None
     scout: Optional[StageOptions] = None
     lockin: Optional[StageOptions] = None
+    cavity_gds: Optional[str] = None
+    holes_gds: Optional[str] = None
 
 
 def format_thickness_tag(value: float) -> str:
@@ -175,6 +177,8 @@ def config_from_args(args: argparse.Namespace) -> WorkflowConfig:
     config.n_bg = args.n_bg
     config.NA = args.na
     config.resonance_wavelength_um = args.resonance_wavelength_um
+    config.cavity_gds = args.cavity_gds
+    config.holes_gds = args.holes_gds
 
     # Stage-specific overrides
     config.scout.run_time_ps = args.scout_run_time_ps
@@ -255,6 +259,8 @@ def run_scout_stage(config: WorkflowConfig) -> Dict[str, Any]:
         thickness_um=config.thickness_um,
         wavelength_um=config.initial_wavelength_um,
         source_bandwidth_rel=stage.bandwidth_rel,
+        cavity_gds=config.cavity_gds,
+        holes_gds=config.holes_gds,
     )
     simulation = setup.create_q_scout_simulation(run_time_ps=stage.run_time_ps)
     setup.save_simulation(simulation, str(stage.simulation_path))
@@ -342,6 +348,8 @@ def run_lockin_stage(config: WorkflowConfig, resonance_summary: Dict[str, Any]) 
         thickness_um=config.thickness_um,
         wavelength_um=lockin_wavelength,
         source_bandwidth_rel=stage.bandwidth_rel,
+        cavity_gds=getattr(config, 'cavity_gds', None),
+        holes_gds=getattr(config, 'holes_gds', None),
     )
     simulation = setup.create_simulation(run_time_ps=stage.run_time_ps)
     setup.save_simulation(simulation, str(stage.simulation_path))
@@ -392,6 +400,8 @@ def run_lockin_stage(config: WorkflowConfig, resonance_summary: Dict[str, Any]) 
     try:
         mv_results = analyze_mode_volume(
             data_path=str(stage.results_path),
+            cavity_gds=(getattr(config, 'cavity_gds', None) or "gds/Cavity_Design.gds"),
+            holes_gds=(getattr(config, 'holes_gds', None) or "gds/Holes_Design.gds"),
             thickness_um=config.thickness_um,
             wavelength_um=lockin_wavelength,
             Q=q_for_lockin,
@@ -434,6 +444,8 @@ def run_lockin_stage(config: WorkflowConfig, resonance_summary: Dict[str, Any]) 
             data_path=str(stage.results_path),
             monitor_name="field_near",
             wavelength_um=lockin_wavelength,
+            cavity_gds=(getattr(config, 'cavity_gds', None) or "gds/Cavity_Design.gds"),
+            holes_gds=(getattr(config, 'holes_gds', None) or "gds/Holes_Design.gds"),
             save_results=True,
             create_plots=True,
         )
@@ -592,6 +604,8 @@ def parse_args(argv: Optional[list] = None) -> argparse.Namespace:
     parser.add_argument("--lockin-sim", type=str, help="Output path for the lock-in simulation JSON file.")
     parser.add_argument("--scout-summary", type=str, help="Output path for the scout summary JSON file.")
     parser.add_argument("--lockin-summary", type=str, help="Output path for the lock-in summary JSON file.")
+    parser.add_argument("--cavity-gds", type=str, default=None, help="Cavity GDS file name or path (e.g., Cavity_Design.gds)")
+    parser.add_argument("--holes-gds", type=str, default=None, help="Holes GDS file name or path (e.g., Holes_Design.gds)")
     parser.add_argument(
         "--run-sims",
         action="store_true",

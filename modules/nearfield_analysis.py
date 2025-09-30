@@ -31,7 +31,7 @@ class NearFieldAnalyzer:
     Comprehensive near-field analyzer for Tidy3D simulations
     """
 
-    def __init__(self, wavelength_um: float = 0.62):
+    def __init__(self, wavelength_um: float = 0.62, cavity_gds: Optional[str] = None, holes_gds: Optional[str] = None):
         """
         Initialize the near-field analyzer
 
@@ -39,6 +39,38 @@ class NearFieldAnalyzer:
             wavelength_um: Analysis wavelength in micrometers
         """
         self.wavelength_um = wavelength_um
+        # Resolve and store robust GDS paths with fallbacks
+        from pathlib import Path as _Path
+        _repo_root = _Path(__file__).resolve().parents[1]
+        def _resolve_gds(user_input: Optional[str], defaults: list) -> str:
+            # If user provided, prefer it; resolve relative to repo_root/gds if needed
+            if user_input:
+                p = _Path(user_input)
+                if not p.is_absolute():
+                    # If it's a bare filename, look under gds/
+                    p = (_repo_root / 'gds' / p.name).resolve()
+                else:
+                    p = p.resolve()
+                if p.exists():
+                    return str(p)
+            # Try provided list of defaults in order
+            for name in defaults:
+                cand = (_repo_root / 'gds' / name).resolve()
+                if cand.exists():
+                    return str(cand)
+            # Fall back to first default even if missing, so downstream warnings trigger
+            return str((_repo_root / 'gds' / defaults[0]).resolve())
+
+        self.cavity_gds = _resolve_gds(cavity_gds, [
+            'Cavity_Design.gds',
+            'Cavity_Fab.gds',
+            'Cavity.gds',
+        ])
+        self.holes_gds = _resolve_gds(holes_gds, [
+            'Holes_Design.gds',
+            'Holes_Fab.gds',
+            'Holes.gds',
+        ])
         self.results = {}
 
     # ------------------------------ Public API ------------------------------
@@ -589,15 +621,23 @@ class NearFieldAnalyzer:
 
         eps = np.full((Ny, Nx), n_clad**2, dtype=float)
 
-        # Resolve GDS paths relative to repo root so CWD doesn't matter
+        # Resolve GDS paths robustly: bare filenames -> repo_root/gds/<name>
         from pathlib import Path as _Path
         _repo_root = _Path(__file__).resolve().parents[1]
-        cav_path = _Path(cavity_gds)
-        if not cav_path.is_absolute():
-            cav_path = (_repo_root / cav_path).resolve()
-        hol_path = _Path(holes_gds)
-        if not hol_path.is_absolute():
-            hol_path = (_repo_root / hol_path).resolve()
+        cav_in = _Path(cavity_gds)
+        if not cav_in.is_absolute():
+            cav_base = cav_in.name if cav_in.parent == _Path('.') or str(cav_in.parent) == '' else str(cav_in)
+            cav_path = (_repo_root / 'gds' / cav_base) if _Path(cav_base).name == cav_base else (_repo_root / cav_base)
+            cav_path = cav_path.resolve()
+        else:
+            cav_path = cav_in
+        hol_in = _Path(holes_gds)
+        if not hol_in.is_absolute():
+            hol_base = hol_in.name if hol_in.parent == _Path('.') or str(hol_in.parent) == '' else str(hol_in)
+            hol_path = (_repo_root / 'gds' / hol_base) if _Path(hol_base).name == hol_base else (_repo_root / hol_base)
+            hol_path = hol_path.resolve()
+        else:
+            hol_path = hol_in
 
         # Cavity polygons
         cav = gdstk.read_gds(str(cav_path))
@@ -631,15 +671,22 @@ class NearFieldAnalyzer:
         return eps  # (Ny, Nx)
 
     def _add_structure_outline_nearfield(
-        self, ax, x: np.ndarray, y: np.ndarray, n_core=2.414, n_clad=1.0, color="white"
+        self, ax, x: np.ndarray, y: np.ndarray, n_core=2.414, n_clad=1.0, color="white",
+        cavity_gds: Optional[str] = None, holes_gds: Optional[str] = None
     ):
         """
         Add structure outline using the mask-on-grid approach (perfectly registered to the image).
         """
         try:
             from skimage import measure
-
-            eps = self._build_eps_mask_xy(x, y, n_core=n_core, n_clad=n_clad)
+            
+            eps = self._build_eps_mask_xy(
+                    x, y,
+                    cavity_gds=(cavity_gds or self.cavity_gds or "gds/Cavity_Design.gds"),
+                    holes_gds=(holes_gds or self.holes_gds or "gds/Holes_Design.gds"),
+                    n_core=n_core,
+                    n_clad=n_clad,
+                )
             thr = 0.5 * (n_core**2 + n_clad**2)
             contours = measure.find_contours(eps, thr)
 
@@ -773,6 +820,8 @@ def analyze_nearfield(
     data_path: str,
     monitor_name: str = "fld_xy_narrow",
     wavelength_um: float = 0.62,
+    cavity_gds: Optional[str] = None,
+    holes_gds: Optional[str] = None,
     save_results: bool = True,
     create_plots: bool = True,
 ) -> Dict:
@@ -780,7 +829,7 @@ def analyze_nearfield(
     Convenience function to analyze near-field from simulation data
     """
     data = td.SimulationData.from_file(data_path)
-    analyzer = NearFieldAnalyzer(wavelength_um=wavelength_um)
+    analyzer = NearFieldAnalyzer(wavelength_um=wavelength_um, cavity_gds=cavity_gds, holes_gds=holes_gds)
     results = analyzer.analyze_nearfield(
         data=data,
         monitor_name=monitor_name,
