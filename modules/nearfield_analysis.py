@@ -445,7 +445,7 @@ class NearFieldAnalyzer:
         Ez2: np.ndarray,
     ):
         """
-        Create near-field visualization plots showing only field intensity, Ex real, and Ey real
+        Create near-field visualization plots showing field intensity, Ey real, and Ey imaginary
         """
         print("\n📊 Creating near-field analysis plots...")
         apply_theme()
@@ -492,36 +492,12 @@ class NearFieldAnalyzer:
         # Overlay structure outline
         self._add_structure_outline_nearfield(axes[0], x, y)
 
-        # 2) Ex (real) - with symmetric colormap limits
-        ex_real = np.real(Ex2)
-        vmax_ex = np.max(np.abs(ex_real))
-        vmin_ex = -vmax_ex
-        
-        im2 = axes[1].pcolormesh(
-            XX,
-            YY,
-            ex_real,
-            shading="auto",
-            cmap=bipolar_cmap,
-            vmin=vmin_ex,
-            vmax=vmax_ex,
-        )
-        axes[1].set_aspect("equal")
-        axes[1].set_title("Ex (real)", fontsize=14, fontweight="bold")
-        axes[1].set_xlabel("x (µm)")
-        axes[1].set_ylabel("y (µm)")
-        axes[1].grid(False)
-        plt.colorbar(im2, ax=axes[1], label="Ex (V/m)", shrink=0.8, aspect=8)
-        
-        # Overlay structure outline in dark grey
-        self._add_structure_outline_nearfield(axes[1], x, y, color="darkgrey")
-
-        # 3) Ey (real) - with symmetric colormap limits
+        # 2) Ey (real) - with symmetric colormap limits
         ey_real = np.real(Ey2)
         vmax_ey = np.max(np.abs(ey_real))
         vmin_ey = -vmax_ey
         
-        im3 = axes[2].pcolormesh(
+        im2 = axes[1].pcolormesh(
             XX,
             YY,
             ey_real,
@@ -530,8 +506,32 @@ class NearFieldAnalyzer:
             vmin=vmin_ey,
             vmax=vmax_ey,
         )
+        axes[1].set_aspect("equal")
+        axes[1].set_title("Ey (real)", fontsize=14, fontweight="bold")
+        axes[1].set_xlabel("x (µm)")
+        axes[1].set_ylabel("y (µm)")
+        axes[1].grid(False)
+        plt.colorbar(im2, ax=axes[1], label="Ey (V/m)", shrink=0.8, aspect=8)
+        
+        # Overlay structure outline in dark grey
+        self._add_structure_outline_nearfield(axes[1], x, y, color="darkgrey")
+
+        # 3) Ey (imaginary) - with symmetric colormap limits
+        ey_imag = np.imag(Ey2)
+        vmax_ey_imag = np.max(np.abs(ey_imag))
+        vmin_ey_imag = -vmax_ey_imag
+        
+        im3 = axes[2].pcolormesh(
+            XX,
+            YY,
+            ey_imag,
+            shading="auto",
+            cmap=bipolar_cmap,
+            vmin=vmin_ey_imag,
+            vmax=vmax_ey_imag,
+        )
         axes[2].set_aspect("equal")
-        axes[2].set_title("Ey (real)", fontsize=14, fontweight="bold")
+        axes[2].set_title("Ey (imaginary)", fontsize=14, fontweight="bold")
         axes[2].set_xlabel("x (µm)")
         axes[2].set_ylabel("y (µm)")
         axes[2].grid(False)

@@ -572,7 +572,7 @@ def run_complete_analysis(config: Optional[WorkflowConfig] = None) -> Dict[str, 
 def parse_args(argv: Optional[list] = None) -> argparse.Namespace:
     """Parse command-line arguments."""
 
-    thickness_um = 0.182 # default thickness
+    thickness_um = 0.157 # default thickness
     cavity_gds = "gds/Cavity_Fab.gds"
     holes_gds = "gds/Holes_Fab.gds"
 
