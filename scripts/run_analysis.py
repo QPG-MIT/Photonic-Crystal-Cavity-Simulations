@@ -75,6 +75,9 @@ class WorkflowConfig:
     lockin: Optional[StageOptions] = None
     cavity_gds: Optional[str] = None
     holes_gds: Optional[str] = None
+    sidewall_angle_deg: float = 0.0
+    trapezoid_slices: int = 1
+    auto_confirm: bool = False
 
 
 def format_thickness_tag(value: float) -> str:
@@ -179,6 +182,9 @@ def config_from_args(args: argparse.Namespace) -> WorkflowConfig:
     config.resonance_wavelength_um = args.resonance_wavelength_um
     config.cavity_gds = args.cavity_gds
     config.holes_gds = args.holes_gds
+    config.sidewall_angle_deg = args.sidewall_angle_deg
+    config.trapezoid_slices = args.trapezoid_slices
+    config.auto_confirm = getattr(args, 'auto_confirm', False)
 
     # Stage-specific overrides
     config.scout.run_time_ps = args.scout_run_time_ps
@@ -261,6 +267,8 @@ def run_scout_stage(config: WorkflowConfig) -> Dict[str, Any]:
         source_bandwidth_rel=stage.bandwidth_rel,
         cavity_gds=config.cavity_gds,
         holes_gds=config.holes_gds,
+        sidewall_angle_deg=config.sidewall_angle_deg,
+        trapezoid_slices=config.trapezoid_slices,
     )
     simulation = setup.create_q_scout_simulation(run_time_ps=stage.run_time_ps)
     setup.save_simulation(simulation, str(stage.simulation_path))
@@ -272,6 +280,7 @@ def run_scout_stage(config: WorkflowConfig) -> Dict[str, Any]:
             results_path=str(stage.results_path),
             force_rerun=stage.force_rerun,
             estimate_cost_first=stage.estimate_cost,
+            auto_confirm=config.auto_confirm,
             expected_monitors=["probe"],
         )
     else:
@@ -354,6 +363,8 @@ def run_lockin_stage(config: WorkflowConfig, resonance_summary: Dict[str, Any]) 
         source_bandwidth_rel=stage.bandwidth_rel,
         cavity_gds=cavity_gds,
         holes_gds=holes_gds,
+        sidewall_angle_deg=config.sidewall_angle_deg,
+        trapezoid_slices=config.trapezoid_slices,
     )
     simulation = setup.create_simulation(run_time_ps=stage.run_time_ps)
     setup.save_simulation(simulation, str(stage.simulation_path))
@@ -365,6 +376,7 @@ def run_lockin_stage(config: WorkflowConfig, resonance_summary: Dict[str, Any]) 
             results_path=str(stage.results_path),
             force_rerun=stage.force_rerun,
             estimate_cost_first=stage.estimate_cost,
+            auto_confirm=config.auto_confirm,
             expected_monitors=[
                 "probe",
                 "flux",
@@ -599,6 +611,8 @@ def parse_args(argv: Optional[list] = None) -> argparse.Namespace:
         help="Override the lock-in wavelength (µm) when running the lock-in stage only.",
     )
     parser.add_argument("--na", type=float, default=0.6, help="Collection numerical aperture for far-field analyses.")
+    parser.add_argument("--sidewall-angle-deg", type=float, default=13.6, help="Trapezoid sidewall angle in degrees (0 for rectangle).")
+    parser.add_argument("--trapezoid-slices", type=int, default=10, help="Number of vertical slices to approximate trapezoid (>=2 enables).")
     parser.add_argument("--n-bg", type=float, default=1.0, help="Background refractive index.")
     parser.add_argument("--scout-run-time-ps", type=float, default=12.0, help="Scout simulation run time (ps).")
     parser.add_argument("--lockin-run-time-ps", type=float, default=8.0, help="Lock-in simulation run time (ps).")

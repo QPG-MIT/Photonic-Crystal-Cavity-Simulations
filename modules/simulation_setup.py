@@ -41,7 +41,9 @@ class SimulationSetup:
                  wavelength_um: float = 0.62,
                  source_bandwidth_rel: float = 0.12,
                  cavity_gds: Optional[str] = None,
-                 holes_gds: Optional[str] = None):
+                 holes_gds: Optional[str] = None,
+                 sidewall_angle_deg: float = 0.0,
+                 trapezoid_slices: int = 1):
         """
         Initialize simulation setup parameters.
 
@@ -57,6 +59,9 @@ class SimulationSetup:
         self._cavity_gds_input = cavity_gds
         self._holes_gds_input = holes_gds
         self.params = self._setup_geometry_parameters()
+        # Trapezoid sidewall configuration (0 disables, slices>=2 enables stepped taper)
+        self.sidewall_angle_deg = float(sidewall_angle_deg or 0.0)
+        self.trapezoid_slices = int(trapezoid_slices or 1)
         self.diamond_medium, self.clad_medium, self.f0_center = self._create_diamond_medium()
         
     def _setup_geometry_parameters(self) -> Dict:
@@ -232,7 +237,7 @@ class SimulationSetup:
         }
     
     def create_core_structure(self, geom_params: Dict) -> td.Structure:
-        """Create core structure from rectangle."""
+        """Create core structure from rectangle or trapezoid (stepped taper)."""
         print("\n🏗️  Creating core structure...")
         
         rect_vertices = [
@@ -241,18 +246,48 @@ class SimulationSetup:
             (geom_params['xmax'], geom_params['ymax']),
             (geom_params['xmax'], geom_params['ymin'])
         ]
-        
+
+        # If sidewall taper requested, use native PolySlab sidewall_angle (no slicing)
+        if self.sidewall_angle_deg <= 0.0:
+            core_geo = td.PolySlab(
+                vertices=rect_vertices,
+                axis=2,
+                slab_bounds=(-self.params['thickness_um']/2, self.params['thickness_um']/2),
+                reference_plane="middle",
+            )
+            core_struct = td.Structure(geometry=core_geo, medium=self.diamond_medium)
+            print(f"  - Core rectangle created with {len(rect_vertices)} vertices")
+            print(f"  - Thickness: {self.params['thickness_um']} µm")
+            return core_struct
+
+        # Trapezoid using PolySlab sidewall_angle
+        t = float(self.params['thickness_um'])
+        angle_rad = float(np.deg2rad(self.sidewall_angle_deg))
+        width_x = geom_params['xmax'] - geom_params['xmin']
+        width_y = geom_params['ymax'] - geom_params['ymin']
+        inset_top = t * np.tan(angle_rad)
+        if 2 * inset_top >= min(width_x, width_y):
+            print("⚠️  Sidewall angle too large for given footprint; reducing to fit.")
+            # Cap angle so that top width remains positive in both x and y
+            max_inset = 0.49 * min(width_x, width_y)
+            angle_rad = np.arctan(max_inset / t)
+            inset_top = t * np.tan(angle_rad)
+
         core_geo = td.PolySlab(
             vertices=rect_vertices,
             axis=2,
-            slab_bounds=(-self.params['thickness_um']/2, self.params['thickness_um']/2),
-            reference_plane="middle",
+            slab_bounds=(-t/2, t/2),
+            reference_plane="bottom",  # define vertices on bottom plane
+            sidewall_angle=angle_rad,
         )
-        
         core_struct = td.Structure(geometry=core_geo, medium=self.diamond_medium)
-        print(f"  - Core rectangle created with {len(rect_vertices)} vertices")
-        print(f"  - Thickness: {self.params['thickness_um']} µm")
-        
+
+        top_width_x = max(width_x - 2 * inset_top, 0.0)
+        top_width_y = max(width_y - 2 * inset_top, 0.0)
+        print(f"  - Trapezoidal core (native sidewall): sidewall_angle={self.sidewall_angle_deg:.2f}°")
+        print(f"  - Bottom width (x × y): {width_x:.3f} µm × {width_y:.3f} µm")
+        print(f"  - Top width    (x × y): {top_width_x:.3f} µm × {top_width_y:.3f} µm")
+        print(f"  - Thickness: {t} µm")
         return core_struct
     
     def create_hole_structures(self, geom_params: Dict) -> List[td.Structure]:

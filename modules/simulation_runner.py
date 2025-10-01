@@ -183,12 +183,13 @@ class SimulationRunner:
             return False
     
     def run_simulation(self, 
-                      simulation: td.Simulation, 
-                      results_path: str = "simulation_results.hdf5",
-                      task_name: Optional[str] = None,
-                      force_rerun: bool = False,
-                      estimate_cost_first: bool = True,
-                      expected_monitors: Optional[list] = None) -> Optional[td.SimulationData]:
+                     simulation: td.Simulation, 
+                     results_path: str = "simulation_results.hdf5",
+                     task_name: Optional[str] = None,
+                     force_rerun: bool = False,
+                     estimate_cost_first: bool = True,
+                     expected_monitors: Optional[list] = None,
+                     auto_confirm: bool = False) -> Optional[td.SimulationData]:
         """
         Run the simulation with comprehensive error handling.
         
@@ -227,10 +228,18 @@ class SimulationRunner:
         # Get user confirmation
         if estimated_cost is not None:
             print(f"\n⚠️  This simulation will cost approximately {estimated_cost:.3f} FlexCredits!")
-            confirm = input("Do you want to proceed with the simulation? (y/N): ").strip().lower()
+            if auto_confirm:
+                print("Auto-confirm enabled; proceeding with simulation.")
+                confirm = 'y'
+            else:
+                confirm = input("Do you want to proceed with the simulation? (y/N): ").strip().lower()
         else:
             print("\n⚠️  Could not estimate cost. Proceeding without cost information.")
-            confirm = input("Are you sure you want to run the simulation? (y/N): ").strip().lower()
+            if auto_confirm:
+                print("Auto-confirm enabled; proceeding with simulation.")
+                confirm = 'y'
+            else:
+                confirm = input("Are you sure you want to run the simulation? (y/N): ").strip().lower()
         
         if confirm != 'y':
             print("Simulation cancelled.")
