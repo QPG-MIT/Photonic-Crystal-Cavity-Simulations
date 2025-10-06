@@ -409,7 +409,7 @@ class PolarizationAnalyzer:
         plt.plot(np.rad2deg(theta2d[:, 0]), DoLP_t, label="DoLP", color=PALETTE[0])
         plt.plot(np.rad2deg(theta2d[:, 0]), DoCP_t, label="DoCP", color=PALETTE[1])
         plt.plot(np.rad2deg(theta2d[:, 0]), DoP_t, label="DoP", linestyle="--", color=PALETTE[2])
-        plt.axvline(np.rad2deg(res.theta_max), color="k", ls=":", label="θ_max (NA)")
+        plt.axvline(np.rad2deg(res.theta_max), color="k", ls=":", label=f"θ$_{{max}}$ = {np.rad2deg(res.theta_max):.1f}° (NA)")
         plt.xlabel("θ (deg)")
         plt.ylabel("degree")
         plt.legend(frameon=False)

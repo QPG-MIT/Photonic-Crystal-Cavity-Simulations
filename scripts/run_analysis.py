@@ -66,7 +66,7 @@ class WorkflowConfig:
     """Top-level configuration for the two-stage workflow."""
 
     thickness_um: float = 0.14
-    initial_wavelength_um: float = 0.650
+    initial_wavelength_um: float = 0.640
     stage: str = "all"
     n_bg: float = 1.0
     NA: float = 0.9
@@ -138,7 +138,7 @@ def load_json(path: Path) -> Optional[Dict[str, Any]]:
 
 def build_default_workflow_config(
     thickness_um: float = 0.14,
-    initial_wavelength_um: float = 0.650,
+    initial_wavelength_um: float = 0.640,
 ) -> WorkflowConfig:
     """Create a workflow configuration with sensible defaults."""
 
