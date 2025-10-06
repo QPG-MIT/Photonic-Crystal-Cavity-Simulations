@@ -298,11 +298,26 @@ def run_scout_stage(config: WorkflowConfig) -> Dict[str, Any]:
         save_results=False,
     )
 
-    freq_hz = extract_float(q_results.get("frequencies_hz"))
-    q_factor = extract_float(q_results.get("q_factors"))
+    # Use the selected resonance index from the analysis results
+    sel_idx = int(q_results.get("selected_index", 0))
+
+    # Safely coerce arrays/lists and select the chosen mode
+    def _at_index(arr_like, idx):
+        if arr_like is None:
+            return None
+        arr = np.atleast_1d(np.asarray(arr_like))
+        if arr.size == 0:
+            return None
+        idx = max(0, min(int(idx), arr.size - 1))
+        return float(arr[idx])
+
+    freq_hz = _at_index(q_results.get("frequencies_hz"), sel_idx)
+    q_factor = _at_index(q_results.get("q_factors"), sel_idx)
     tau_ps = None
     if "decay_times_s" in q_results:
-        tau_ps = extract_float(np.array(q_results["decay_times_s"]) * 1e12)
+        tau_ps_val = _at_index(q_results.get("decay_times_s"), sel_idx)
+        if tau_ps_val is not None:
+            tau_ps = float(tau_ps_val) * 1e12
 
     if freq_hz is None or q_factor is None:
         raise RuntimeError("Q-factor analysis did not return valid frequency/Q values.")
@@ -584,7 +599,7 @@ def run_complete_analysis(config: Optional[WorkflowConfig] = None) -> Dict[str, 
 def parse_args(argv: Optional[list] = None) -> argparse.Namespace:
     """Parse command-line arguments."""
 
-    thickness_um = 0.157 # default thickness
+    thickness_um = 0.136 # default thickness
     cavity_gds = "gds/Cavity_Fab.gds"
     holes_gds = "gds/Holes_Fab.gds"
 
@@ -601,7 +616,7 @@ def parse_args(argv: Optional[list] = None) -> argparse.Namespace:
     parser.add_argument(
         "--initial-wavelength-um",
         type=float,
-        default=0.650,
+        default=0.630,
         help="Initial wavelength guess for the scout simulation (µm).",
     )
     parser.add_argument(
@@ -611,7 +626,7 @@ def parse_args(argv: Optional[list] = None) -> argparse.Namespace:
         help="Override the lock-in wavelength (µm) when running the lock-in stage only.",
     )
     parser.add_argument("--na", type=float, default=0.6, help="Collection numerical aperture for far-field analyses.")
-    parser.add_argument("--sidewall-angle-deg", type=float, default=13.6, help="Trapezoid sidewall angle in degrees (0 for rectangle).")
+    parser.add_argument("--sidewall-angle-deg", type=float, default=15.6, help="Trapezoid sidewall angle in degrees (0 for rectangle).")
     parser.add_argument("--trapezoid-slices", type=int, default=10, help="Number of vertical slices to approximate trapezoid (>=2 enables).")
     parser.add_argument("--n-bg", type=float, default=1.0, help="Background refractive index.")
     parser.add_argument("--scout-run-time-ps", type=float, default=12.0, help="Scout simulation run time (ps).")
