@@ -482,7 +482,7 @@ class SimulationSetup:
             interval_space=(1, 1, 1),
         )
     
-    def create_simulation(self, run_time_ps: float = 10.0) -> td.Simulation:
+    def create_simulation(self, run_time_ps: float = 10.0, min_steps_per_wvl: int = 18) -> td.Simulation:
         """Create the complete simulation with all components."""
         print("\n🚀 Creating complete simulation...")
         
@@ -508,7 +508,7 @@ class SimulationSetup:
         simulation = td.Simulation(
             size=(geom_params['size_x'], geom_params['size_y'], geom_params['size_z']),
             center=(geom_params['cx'], geom_params['cy'], geom_params['cz']),
-            grid_spec=td.GridSpec.auto(min_steps_per_wvl=18, wavelength=self.wavelength_um),
+            grid_spec=td.GridSpec.auto(min_steps_per_wvl=min_steps_per_wvl, wavelength=self.wavelength_um),
             structures=all_structures,
             sources=[source],
             monitors=all_monitors,
@@ -520,12 +520,12 @@ class SimulationSetup:
         print(f"  - Structures: {len(all_structures)}")
         print(f"  - Monitors: {len(all_monitors)}")
         print(f"  - Run time: {run_time_ps:.1f} ps")
-        print(f"  - Grid: min_steps_per_wvl=18 with wavelength={self.wavelength_um} µm")
+        print(f"  - Grid: min_steps_per_wvl={min_steps_per_wvl} with wavelength={self.wavelength_um} µm")
         print(f"  - Boundaries: PML(8 layers)")
         
         return simulation
 
-    def create_q_scout_simulation(self, run_time_ps: float = 10.0) -> td.Simulation:
+    def create_q_scout_simulation(self, run_time_ps: float = 10.0, min_steps_per_wvl: int = 18) -> td.Simulation:
         """Create a simplified simulation for the scout stage (Q-only probe)."""
         print("\n🚀 Creating minimal scout simulation (Q-only)...")
 
@@ -546,7 +546,7 @@ class SimulationSetup:
         simulation = td.Simulation(
             size=(geom_params['size_x'], geom_params['size_y'], geom_params['size_z']),
             center=(geom_params['cx'], geom_params['cy'], geom_params['cz']),
-            grid_spec=td.GridSpec.auto(min_steps_per_wvl=18, wavelength=self.wavelength_um),
+            grid_spec=td.GridSpec.auto(min_steps_per_wvl=min_steps_per_wvl, wavelength=self.wavelength_um),
             structures=all_structures,
             sources=[source],
             monitors=probe_monitors,
