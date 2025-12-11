@@ -1,0 +1,42 @@
+{
+  "farfield_kspace": {
+    "intensity_stats": {
+      "max": 1.9856413757679547e-07,
+      "mean": 5.771433819745653e-08,
+      "total": 9.234293975168839e-05,
+      "shape": [
+        40,
+        40
+      ]
+    },
+    "radiation_metrics": {}
+  },
+  "farfield_angles": {
+    "intensity_stats": {
+      "max": 1.9874646284279152e-07,
+      "mean": 6.714677169838978e-08,
+      "total": 0.001342935487627983,
+      "shape": [
+        100,
+        200
+      ]
+    },
+    "radiation_metrics": {
+      "directivity": 0.0018597481539472938,
+      "beam_width_deg": 2.502181273841859,
+      "max_intensity": 1.9874646284279152e-07,
+      "total_power": 0.001342935487627983
+    }
+  },
+  "collection_efficiency": {
+    "total_power": 0.0006101354904685546,
+    "collected_power": 0.0002662598038037176,
+    "collection_efficiency": 0.2181972758208533,
+    "collection_efficiency_full_sphere": 0.2181972758208533,
+    "total_power_full_sphere": 0.0012202709809371092,
+    "hemisphere_coverage": "upper hemisphere only",
+    "NA": 0.6,
+    "n_bg": 1.0,
+    "theta_max_deg": 36.86989764584402
+  }
+}
