@@ -1,0 +1,32 @@
+{
+  "coordinates": {
+    "x_range": [
+      -6.415892697466486,
+      6.415892697466379
+    ],
+    "y_range": [
+      -1.3052199820625843,
+      1.3052199820625825
+    ]
+  },
+  "confinement": {
+    "width_x_um": 3.1874234896396203,
+    "width_y_um": 0.39545274581638334,
+    "confinement_area_um2": 1.2604753710576264,
+    "aspect_ratio": 8.060188033489101
+  },
+  "mode_parameters": {
+    "mode_area_um2": 1.7151310443878174,
+    "mode_area_lambda2": 4.202617817941244,
+    "effective_index": 2.546961897282851
+  },
+  "quality_metrics": {
+    "field_uniformity": 4.8156538009643555,
+    "polarization_fractions": {
+      "Ex": 0.35607150197029114,
+      "Ey": 0.6104663610458374,
+      "Ez": 0.03346199914813042
+    },
+    "field_concentration": 0.9734009504318237
+  }
+}

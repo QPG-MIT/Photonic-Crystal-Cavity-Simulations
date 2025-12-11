@@ -189,7 +189,8 @@ class SimulationRunner:
                      force_rerun: bool = False,
                      estimate_cost_first: bool = True,
                      expected_monitors: Optional[list] = None,
-                     auto_confirm: bool = False) -> Optional[td.SimulationData]:
+                     auto_confirm: bool = False,
+                     verbose: bool = False) -> Optional[td.SimulationData]:
         """
         Run the simulation with comprehensive error handling.
         
@@ -255,7 +256,7 @@ class SimulationRunner:
                 task_name=task_name,
                 folder_name="default",
                 path=results_path,
-                verbose=True
+                verbose=verbose
             )
             
             elapsed_time = time.time() - start_time

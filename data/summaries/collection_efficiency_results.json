@@ -1,0 +1,31 @@
+{
+  "farfield_kspace": {
+    "collection_efficiency": 1.0,
+    "total_power": 9.234293975168839e-05,
+    "collected_power": 9.234293975168839e-05,
+    "k_collection": 5901228.26048502,
+    "k_max": 1.3435028842544403,
+    "NA_effective": 1.3659897481857632e-07
+  },
+  "farfield_angles": {
+    "collection_efficiency": 0.2181972758208533,
+    "collection_efficiency_full_sphere": 0.2181972758208533,
+    "total_power": 0.0006101354904685546,
+    "total_power_full_sphere": 0.0012202709809371092,
+    "collected_power": 0.0002662598038037176,
+    "hemisphere_coverage": "upper hemisphere only",
+    "theta_max_deg": 36.86989764584402,
+    "directivity": 0.004093388813094704,
+    "max_intensity": 1.9874646284279152e-07
+  },
+  "overall": {
+    "overall_efficiency": 0.27319742530783786,
+    "mean_efficiency": 0.6090986379104266,
+    "std_efficiency": 0.3909013620895734,
+    "max_efficiency": 1.0,
+    "min_efficiency": 0.2181972758208533,
+    "total_power": 0.0013126139206887976,
+    "collected_power": 0.000358602743555406,
+    "num_monitors": 2
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "stage": "lockin",
+  "simulation_file": "/Users/sandrobuzzi/Documents/MIT/QPAIG/Projects/Silicon Hard Mask/GitHubRepo/SiliconHardMask_Modeling/Simulations/data/simulations/simulation_lockin_full_0.136um.json",
+  "results_file": "/Users/sandrobuzzi/Documents/MIT/QPAIG/Projects/Silicon Hard Mask/GitHubRepo/SiliconHardMask_Modeling/Simulations/data/results/results_lockin_full_0.136um.hdf5",
+  "run_time_ps": 8.0,
+  "bandwidth_rel": 0.02,
+  "lockin_wavelength_um": 0.6388350048330285,
+  "lockin_frequency_thz": 469.27994823695735,
+  "q_factor": 69696.35986170902,
+  "mode_volume_um3": 0.038655807121851765,
+  "purcell_factor": 2546.903166466634,
+  "dolp": 0.137288130532647,
+  "docp": 0.0019196083317302973,
+  "dop": 0.13730155017805284,
+  "psi_deg": -0.08501120056792026,
+  "chi_deg": 0.05499276163695196,
+  "nearfield_confinement_um2": 1.2604753710576264,
+  "nearfield_mode_area_um2": 1.7151310443878174,
+  "collection_efficiency": 0.27319742530783786
+}

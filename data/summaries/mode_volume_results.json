@@ -1,0 +1,30 @@
+{
+  "effective_mode_volume_m3": 3.865580712185176e-20,
+  "effective_mode_volume_um3": 0.038655807121851765,
+  "purcell_factor": 2546.903166466634,
+  "quality_factor": 69696.35986170902,
+  "wavelength_um": 0.6388350048330285,
+  "emitter_environment_index": 2.4115902364090958,
+  "core_index": 2.4115902364090958,
+  "cladding_index": 1.0,
+  "thickness_um": 0.136,
+  "field_shape": [
+    67,
+    103,
+    409
+  ],
+  "coordinate_ranges": {
+    "x_um": [
+      -3.0019314456036135,
+      3.001931445603507
+    ],
+    "y_um": [
+      -1.518164986546938,
+      1.5181649865469362
+    ],
+    "z_um": [
+      -1.0032749775782306,
+      1.0032749775782248
+    ]
+  }
+}

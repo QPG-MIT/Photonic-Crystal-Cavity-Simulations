@@ -40,17 +40,24 @@ class ResonanceConfig:
     # Relative frequency window around initial guess (e.g., ±12%)
     rel_window: float = 0.12
     # Initial number of trial frequencies used by the resonance finder
-    init_num_freqs: int = 400
+    init_num_freqs: int = 800  # Increased for better resolution
     # Regularization / conditioning parameter (implementation dependent)
-    rcond: float = 1e-4
+    rcond: float = 1e-5  # More sensitive for better mode detection
     # Plot controls
     do_plot: bool = True
     # Tail visualization controls
-    guard_cycles: int = 8
-    max_modes_for_fit: int = 1
+    guard_cycles: int = 12
+    # Allow up to 2 modes in the analytic reconstruction to handle beating
+    max_modes_for_fit: int = 2
     # Fractional window within the tail used to solve amplitudes (for alignment)
-    fit_window_lo: float = 0.50
-    fit_window_hi: float = 0.90
+    fit_window_lo: float = 0.60
+    fit_window_hi: float = 0.95
+    # Signal filtering options
+    apply_bandpass_filter: bool = True
+    filter_order: int = 4
+    # Q-factor filtering
+    min_q_factor: float = 1000.0
+    max_q_factor: float = 500000.0  # Allow higher Q-factors for high-Q cavities
 
 
 def _wavelength_to_frequency_hz(wavelength_um: float) -> float:
@@ -111,6 +118,45 @@ def _extract_time_signal(sim_data: td.SimulationData, monitor_name: str = "probe
         else:
             raise RuntimeError(f"Length mismatch: len(t)={t.size}, len(e)={e.size}")
     return t, e
+
+
+def _apply_signal_filtering(t: np.ndarray, y: np.ndarray, config: ResonanceConfig) -> np.ndarray:
+    """Apply bandpass filtering to improve resonance detection."""
+    if not config.apply_bandpass_filter:
+        return y
+    
+    try:
+        from scipy.signal import butter, filtfilt
+        
+        # Calculate sampling frequency
+        dt = float(np.mean(np.diff(t)))
+        fs = 1.0 / dt
+        
+        # Define frequency range based on expected resonance
+        # Use a reasonable range around the expected frequency
+        f0 = _wavelength_to_frequency_hz(config.wavelength_um)
+        f_low = f0 * 0.8  # 20% below expected
+        f_high = f0 * 1.2  # 20% above expected
+        
+        # Normalize frequencies
+        nyquist = fs / 2
+        low_norm = f_low / nyquist
+        high_norm = f_high / nyquist
+        
+        # Ensure frequencies are within valid range
+        low_norm = max(0.01, min(0.99, low_norm))
+        high_norm = max(0.01, min(0.99, high_norm))
+        
+        if low_norm >= high_norm:
+            return y  # Skip filtering if range is invalid
+        
+        # Design Butterworth bandpass filter
+        b, a = butter(config.filter_order, [low_norm, high_norm], btype='band')
+        y_filtered = filtfilt(b, a, y)
+        return y_filtered
+    except Exception:
+        # If filtering fails, return original signal
+        return y
 
 
 def _plot_ringdown_like_old(t_all: np.ndarray, y_all: np.ndarray, i0: int, model_env: Optional[np.ndarray], f_mode: float, a_mode: float) -> None:
@@ -258,6 +304,9 @@ def analyze_q_factor(
         mdat = sim_data[monitor_name]
     # Prepare numpy signal as fallback and for plotting
     t, y = _extract_time_signal(sim_data, monitor_name=monitor_name, field=field)
+    
+    # Apply signal filtering to improve resonance detection
+    y_filtered = _apply_signal_filtering(t, y, ResonanceConfig)
 
     # Build resonance search window around wavelength guess
     f0 = _wavelength_to_frequency_hz(wavelength_um)
@@ -405,8 +454,56 @@ def analyze_q_factor(
         amplitudes = None
         q_vals = np.pi * freq_hz / np.maximum(alpha_hz, 1e-30)
 
-    # Select Mode 1 = highest-Q mode
-    idx = int(np.argmax(q_vals)) if np.size(q_vals) else 0
+    # Select the best mode based on amplitude (most dominant in ringdown) and reasonable Q
+    # Use the available variables from the ResonanceFinder results
+    q_factors_available = None
+    amplitudes_available = None
+    
+    # Get Q-factors from the available variables
+    if q_vals is not None and len(q_vals) > 0:
+        q_factors_available = np.array(q_vals)
+    
+    # Get amplitudes from the available variables  
+    if amplitudes is not None and len(amplitudes) > 0:
+        amplitudes_available = np.array(amplitudes)
+    
+    
+    if q_factors_available is not None and amplitudes_available is not None:
+        # Strategy: Use amplitude to find the most dominant mode, but filter out unrealistic Q modes
+        # Filter out unrealistic Q-factors (too low or too high)
+        reasonable_q_mask = (q_factors_available >= ResonanceConfig.min_q_factor) & \
+                           (q_factors_available <= ResonanceConfig.max_q_factor)
+        
+        if np.any(reasonable_q_mask):
+            # Among reasonable Q modes, pick the one with highest amplitude (most dominant)
+            reasonable_amplitudes = amplitudes_available[reasonable_q_mask]
+            reasonable_indices = np.where(reasonable_q_mask)[0]
+            best_amplitude_idx = reasonable_indices[np.argmax(reasonable_amplitudes)]
+            idx = int(best_amplitude_idx)
+            # print(f"DEBUG: Using highest amplitude mode with Q > 100 (index {idx}, Q={q_factors_available[idx]:.0f}, amp={amplitudes_available[idx]:.0f})")
+        else:
+            # If no reasonable Q modes, pick highest amplitude overall
+            idx = int(np.argmax(amplitudes_available))
+            # print(f"DEBUG: Using highest amplitude mode overall (index {idx}, Q={q_factors_available[idx]:.0f}, amp={amplitudes_available[idx]:.0f})")
+    elif q_factors_available is not None:
+        # Fallback: if no amplitudes, use highest Q among reasonable modes
+        reasonable_q_mask = (q_factors_available >= ResonanceConfig.min_q_factor) & \
+                           (q_factors_available <= ResonanceConfig.max_q_factor)
+        if np.any(reasonable_q_mask):
+            reasonable_q_factors = q_factors_available[reasonable_q_mask]
+            reasonable_indices = np.where(reasonable_q_mask)[0]
+            best_q_idx = reasonable_indices[np.argmax(reasonable_q_factors)]
+            idx = int(best_q_idx)
+        else:
+            idx = int(np.argmax(q_factors_available))
+    elif 'selected_index' in res and res['selected_index'] is not None:
+        # Use the pre-selected index from ResonanceFinder
+        idx = int(res['selected_index'])
+    else:
+        # Fallback to calculated Q values
+        idx = int(np.argmax(q_vals)) if np.size(q_vals) else 0
+    
+    # print(f"DEBUG: Final idx = {idx}, freq_hz[idx] = {freq_hz[idx] if idx < len(freq_hz) else 'OUT_OF_RANGE'}")
 
     # Build an analytic model from Mode 1 only
     model = None
@@ -449,6 +546,10 @@ def analyze_q_factor(
 
         from numpy.linalg import lstsq as _lstsq
         A_est, *_ = _lstsq(Ew, zw, rcond=None)
+        
+        # Scale the amplitude back to the original scale (undo the weighting)
+        # The weighting was applied to both E and z, so we need to account for this
+        A_est = A_est  # Keep as is since both sides were weighted equally
 
         # Prune to strongest amplitudes if more than 1 kept
         if A_est.size > 1:
@@ -464,7 +565,32 @@ def analyze_q_factor(
         # Reconstruct model over the full tail using the estimated amplitude
         model_tail = E_full @ A_est
         model_env_full = np.full_like(env_full, np.nan, dtype=float)
-        model_env_full[i0:] = np.abs(model_tail)
+        
+        # Scale the amplitude to match the actual envelope at a specific point in the tail
+        # Use the middle of the fit window for better alignment
+        if len(model_tail) > 0:
+            # Find the middle point of the fit window within the tail
+            fit_middle_idx = i_lo + (i_hi - i_lo) // 2
+            if fit_middle_idx < len(env_full):
+                # Get the actual envelope value at the middle of the fit window
+                env_at_fit_middle = env_full[fit_middle_idx]
+                model_at_fit_middle = np.abs(model_tail[fit_middle_idx - i0])
+                
+                if model_at_fit_middle > 0:
+                    scale_factor = env_at_fit_middle / model_at_fit_middle
+                    model_tail = model_tail * scale_factor
+        
+        # Ensure proper alignment: model_tail should match the length of the tail segment
+        tail_length = len(env_full) - i0
+        if len(model_tail) == tail_length:
+            model_env_full[i0:] = np.abs(model_tail)
+        else:
+            # Handle length mismatch by truncating or padding as needed
+            if len(model_tail) > tail_length:
+                model_env_full[i0:] = np.abs(model_tail[:tail_length])
+            else:
+                model_env_full[i0:i0+len(model_tail)] = np.abs(model_tail)
+        
         model = model_env_full
     except Exception as exc:
         # Non-fatal; continue without model overlay

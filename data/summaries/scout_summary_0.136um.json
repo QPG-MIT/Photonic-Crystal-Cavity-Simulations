@@ -1,0 +1,12 @@
+{
+  "stage": "scout",
+  "simulation_file": "/Users/sandrobuzzi/Documents/MIT/QPAIG/Projects/Silicon Hard Mask/GitHubRepo/SiliconHardMask_Modeling/Simulations/data/simulations/simulation_scout_q_only_0.136um.json",
+  "results_file": "/Users/sandrobuzzi/Documents/MIT/QPAIG/Projects/Silicon Hard Mask/GitHubRepo/SiliconHardMask_Modeling/Simulations/data/results/results_scout_q_only_0.136um.hdf5",
+  "run_time_ps": 12.0,
+  "bandwidth_rel": 0.12,
+  "resonance_frequency_thz": 469.2799482369573,
+  "resonance_wavelength_um": 0.6388350048330285,
+  "q_factor": 69696.35986170902,
+  "decay_time_ps": 47.27463949472446,
+  "num_modes": 10
+}
