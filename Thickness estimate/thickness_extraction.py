@@ -13,8 +13,8 @@ from typing import Tuple, Dict, List
 
 import numpy as np
 import matplotlib
-# Use Qt5Agg backend for interactive plots
-matplotlib.use('Qt5Agg')
+# Use MacOSX backend for interactive plots (native on macOS, no extra dependencies)
+matplotlib.use('MacOSX')
 import matplotlib.pyplot as plt
 
 # Global small-text defaults
