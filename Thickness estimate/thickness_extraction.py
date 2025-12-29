@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
 """
-Automatic thickness extraction with uncertainty propagation from width inputs.
+Automatic thickness extraction from tilted SEM (scale-free) - Version 4.
 
-This version clones v3 and adds Monte Carlo propagation of uncertainties in
-top/bottom widths (Wt, Wb) to estimate the uncertainty of the thickness.
+Uses the robust line detection approach from debug_rotation.py:
+1. CLAHE -> Bilateral -> MORPH_CLOSE (to fill holes) -> Canny -> HoughLinesP
+2. Group segments by y-intercept
+3. Fit lines with robust loss (DIST_WELSCH)
+
+Key features:
+- NO pixel scale needed: Uses scale-free formula
+- NO hard-coded rotation: Uses measured image angle
+- Robust line detection that handles surface holes/pits
 """
 
 import argparse
@@ -11,386 +18,443 @@ import json
 import math
 from typing import Tuple, Dict, List
 
+import cv2
 import numpy as np
 import matplotlib
-# Use MacOSX backend for interactive plots (native on macOS, no extra dependencies)
-matplotlib.use('MacOSX')
+matplotlib.use("MacOSX")
 import matplotlib.pyplot as plt
 
-# Global small-text defaults
-matplotlib.rcParams.update({
-    "font.size": 9,
-    "axes.titlesize": 11,
-    "axes.labelsize": 9,
-    "legend.fontsize": 9,
-})
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-from skimage import io, color, util, exposure, feature, transform, morphology
 
 
-# --------------------- utilities ---------------------
+# =============================================================================
+# IMAGE I/O
+# =============================================================================
 
-def to_gray(img: np.ndarray) -> np.ndarray:
-    if img.ndim == 2:
-        return util.img_as_float(img)
-    if img.shape[-1] == 4:
-        img = color.rgba2rgb(img)
+def read_gray(path: str) -> np.ndarray:
+    """Read image and convert to grayscale uint8."""
+    img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+    if img is None:
+        raise FileNotFoundError(path)
+
+    # Handle RGBA
+    if img.ndim == 3 and img.shape[2] == 4:
+        img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+    if img.ndim == 3:
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    else:
+        gray = img
+
+    return gray
+
+
+# =============================================================================
+# LINE DETECTION (from debug_rotation.py - the working approach)
+# =============================================================================
+
+def preprocess_for_edges(img_u8: np.ndarray, debug: bool = False) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Preprocess image for edge detection using the approach that works:
+    CLAHE -> Bilateral -> MORPH_CLOSE (fill holes) -> Canny
+    
+    Returns: (preprocessed_image, edges)
+    """
+    # 1) CLAHE contrast enhancement
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    g = clahe.apply(img_u8)
+    
+    # 2) Bilateral filter (edge-preserving denoising)
+    g_denoised = cv2.bilateralFilter(g, d=9, sigmaColor=75, sigmaSpace=75)
+    
+    # 3) MORPH_CLOSE to fill small dark holes BEFORE Canny
+    # This is the key fix - prevents holes from creating spurious edges
+    k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
+    g_closed = cv2.morphologyEx(g_denoised, cv2.MORPH_CLOSE, k)
+    
+    # 4) Canny edge detection
+    edges = cv2.Canny(g_closed, threshold1=140, threshold2=150, apertureSize=3, L2gradient=True)
+    
+    if debug:
+        print(f"  Preprocessing: CLAHE -> bilateral -> MORPH_CLOSE(9x9) -> Canny(140,150)")
+        print(f"  Edge pixels: {np.sum(edges > 0)} / {edges.size} ({100*np.sum(edges > 0)/edges.size:.2f}%)")
+    
+    return g_closed, edges
+
+
+def group_by_intercept(segments: np.ndarray, tol_px: float = 4.0) -> List[List]:
+    """
+    Group line segments by their y-intercept b in y = mx + b.
+    Works well for nearly horizontal lines.
+    
+    Returns list of groups, each group is a list of (b, length, angle_deg, (x1,y1,x2,y2)).
+    """
+    items = []
+    for (x1, y1, x2, y2) in segments:
+        dx = x2 - x1
+        dy = y2 - y1
+        if abs(dx) < 5:  # skip near-vertical
+            continue
+        m = dy / dx
+        b = y1 - m * x1
+        length = math.hypot(dx, dy)
+        angle_deg = math.degrees(math.atan2(dy, dx))
+        items.append((b, length, angle_deg, (x1, y1, x2, y2)))
+
+    if not items:
+        return []
+
+    # Sort by intercept and cluster
+    items.sort(key=lambda t: t[0])
+    groups = []
+    cur = [items[0]]
+    for it in items[1:]:
+        if abs(it[0] - cur[-1][0]) <= tol_px:
+            cur.append(it)
+        else:
+            groups.append(cur)
+            cur = [it]
+    groups.append(cur)
+    return groups
+
+
+def fit_line_from_segments(group: List) -> Tuple[float, float, float, float, float]:
+    """
+    Fit one line to all endpoints in a group using robust loss (DIST_WELSCH).
+    Returns (vx, vy, x0, y0, angle_deg).
+    """
+    pts = []
+    for (_, _, _, (x1, y1, x2, y2)) in group:
+        pts.append([x1, y1])
+        pts.append([x2, y2])
+    pts = np.asarray(pts, dtype=np.float32)
+
+    # DIST_WELSCH is robust to outliers - prevents stray segments from pulling the fit
+    vx, vy, x0, y0 = cv2.fitLine(pts, cv2.DIST_WELSCH, 0, 0.01, 0.01).flatten()
+    angle_deg = math.degrees(math.atan2(vy, vx))
+    return (float(vx), float(vy), float(x0), float(y0), float(angle_deg))
+
+
+def detect_lines(img_u8: np.ndarray, n_lines: int = 3,
+                 hough_threshold: int = 40,
+                 min_line_length: int = 200,
+                 max_line_gap: int = 20,
+                 intercept_tol: float = 4.0,
+                 debug: bool = False) -> Tuple[float, np.ndarray, dict]:
+    """
+    Detect n_lines horizontal lines using the robust approach:
+    Preprocessing -> HoughLinesP -> Group by intercept -> Fit with robust loss.
+    
+    Returns: (mean_angle_deg, y_intercepts, debug_info)
+    """
+    h, w = img_u8.shape[:2]
+    
+    if debug:
+        print("\n=== LINE DETECTION (HoughLinesP + Robust Fitting) ===")
+    
+    # Step 1: Preprocess
+    preprocessed, edges = preprocess_for_edges(img_u8, debug=debug)
+    
+    # Step 2: HoughLinesP for line segments
+    linesP = cv2.HoughLinesP(
+        edges,
+        rho=1,
+        theta=np.pi / 180,
+        threshold=hough_threshold,
+        minLineLength=min_line_length,
+        maxLineGap=max_line_gap,
+    )
+    
+    if linesP is None:
+        raise RuntimeError("No line segments found by HoughLinesP")
+    
+    segments = linesP[:, 0, :]
+    if debug:
+        print(f"  HoughLinesP: found {len(segments)} segments")
+    
+    # Step 3: Group by y-intercept
+    groups = group_by_intercept(segments, tol_px=intercept_tol)
+    if debug:
+        print(f"  Grouping: {len(groups)} groups (tol={intercept_tol}px)")
+    
+    if len(groups) < n_lines:
+        raise RuntimeError(f"Only found {len(groups)} line groups, need {n_lines}")
+    
+    # Step 4: Keep top n_lines groups by total segment length
+    groups = sorted(groups, key=lambda grp: sum(it[1] for it in grp), reverse=True)[:n_lines]
+    
+    # Step 5: Fit lines to groups
+    fits = []
+    y_intercepts = []
+    for i, grp in enumerate(groups):
+        fit = fit_line_from_segments(grp)
+        fits.append(fit)
         
-    return color.rgb2gray(img)
+        # Compute y-intercept at x=0 from the fitted line
+        vx, vy, x0, y0, angle_deg = fit
+        if abs(vx) > 1e-6:
+            m = vy / vx
+            b = y0 - m * x0
+        else:
+            b = y0  # vertical line
+        y_intercepts.append(b)
+        
+        if debug:
+            median_intercept = np.median([it[0] for it in grp])
+            print(f"  Line {i+1}: angle={angle_deg:.3f}°, y_intercept={b:.2f}px, n_segs={len(grp)}")
+    
+    # Sort by y-intercept (top to bottom)
+    sorted_indices = np.argsort(y_intercepts)
+    y_intercepts = np.array([y_intercepts[i] for i in sorted_indices])
+    fits = [fits[i] for i in sorted_indices]
+    
+    # Compute mean angle
+    angles = np.array([f[4] for f in fits])
+    ang_rad = np.deg2rad(angles)
+    mean_angle = math.degrees(math.atan2(np.mean(np.sin(ang_rad)), np.mean(np.cos(ang_rad))))
+    
+    if debug:
+        print(f"  Final lines (sorted by y): y_intercepts={np.array2string(y_intercepts, precision=2)}")
+        print(f"  Mean angle: {mean_angle:.3f}°")
+        print("=== END LINE DETECTION ===\n")
+    
+    debug_info = {
+        "preprocessed": preprocessed,
+        "edges": edges,
+        "segments": segments,
+        "groups": groups,
+        "fits": fits,
+        "mean_angle_deg": mean_angle,
+    }
+    
+    return mean_angle, y_intercepts, debug_info
 
+
+# =============================================================================
+# GEOMETRY / THICKNESS CALCULATION
+# =============================================================================
 
 def azimuth_from_image_angle(psi_deg: float, theta_deg: float) -> float:
-    """Recover true azimuth φ from measured image angle ψ given tilt θ."""
+    """
+    Recover true azimuth φ from measured image angle ψ given tilt θ:
+    tan(ψ) = tan(φ)*cos(θ)  ->  φ = arctan(tan(ψ)/cos(θ))
+    """
     th = math.radians(theta_deg)
     ps = math.radians(psi_deg)
     return math.degrees(math.atan(math.tan(ps) / max(math.cos(th), 1e-12)))
 
 
-# --------------------- angle estimation ---------------------
-
-def estimate_azimuth(gray: np.ndarray) -> float:
+def thickness_scale_free(
+    dT_px: float,
+    dNB_px: float,
+    Wt_nm: float,
+    Wb_nm: float,
+    theta_deg: float,
+    phi_deg: float
+) -> float:
     """
-    Estimate *image* angle ψ (in deg) from dominant line orientation via Hough.
-    Returns ψ (angle of the lines in the image).
+    Scale-free formula:
+      t = cot(θ)*cos(φ) * ( Wt*(dNB/dT) - (Wb-Wt)/2 )
+
+    dT, dNB can be in pixels; only their ratio is used.
     """
-    img_eq = exposure.equalize_adapthist(gray, clip_limit=0.01)
-    edges = feature.canny(img_eq, sigma=2.0, low_threshold=0.1, high_threshold=0.3)
-    # skimage>=0.25: use footprint_rectangle with keyword arg
-    edges = morphology.binary_closing(edges, morphology.footprint_rectangle(shape=(3, 3)))
+    theta = math.radians(theta_deg)
+    phi = math.radians(phi_deg)
 
-    h, theta, d = transform.hough_line(edges)
-    acc, ang, dist = transform.hough_line_peaks(h, theta, d, num_peaks=20)
-    if len(ang) == 0:
-        return 0.0
+    if dT_px <= 1e-12:
+        return float("nan")
 
-    # Convert to line angles (relative to x-axis); horizontal ≈ 0°
-    line_angles = ang - np.pi/2
-    line_angles_deg = [math.degrees(a) for a in line_angles]
+    cot_theta = math.cos(theta) / max(math.sin(theta), 1e-12)
+    pref = cot_theta * math.cos(phi)
 
-    print(f"Debug: Line angles found: {line_angles_deg}")
-    print(f"Debug: Accumulator values: {acc}")
-
-    # Prefer lines near 0° (horizontal)
-    horizontal_lines = [i for i, angle in enumerate(line_angles_deg) if abs(angle) < 10]
-    if horizontal_lines:
-        weights = acc[horizontal_lines] / np.sum(acc[horizontal_lines])
-        psi = np.average([line_angles_deg[i] for i in horizontal_lines], weights=weights)
-        print(f"Debug: Method 1 (weighted near 0°): {psi:.3f}°")
-        return float(psi)
-
-    # Fallback near -180° (also horizontal)
-    horizontal_lines_180 = [i for i, angle in enumerate(line_angles_deg) if abs(angle + 180) < 10]
-    if horizontal_lines_180:
-        angles_180 = [line_angles_deg[i] + 180 if line_angles_deg[i] < -90 else line_angles_deg[i]
-                      for i in horizontal_lines_180]
-        weights = acc[horizontal_lines_180] / np.sum(acc[horizontal_lines_180])
-        psi = np.average(angles_180, weights=weights)
-        print(f"Debug: Method 2 (near -180°): {psi:.3f}°")
-        return float(psi)
-
-    # Strongest line
-    strongest_idx = np.argmax(acc)
-    psi = line_angles_deg[strongest_idx]
-    print(f"Debug: Method 3 (strongest line): {psi:.3f}°")
-    return float(psi)
+    bracket = Wt_nm * (dNB_px / dT_px) - (Wb_nm - Wt_nm) / 2.0
+    return pref * bracket
 
 
-# --------------------- line detection ---------------------
+# =============================================================================
+# LABELING (enumerate all labelings and pick best)
+# =============================================================================
 
-def detect_horizontal_lines(rot_img: np.ndarray, angle_tol_deg: float = 15) -> Tuple[float, np.ndarray]:
-    """Detect (now nearly horizontal) lines in the rotated image; return common slope and intercepts (unordered)."""
-    img_eq = exposure.equalize_adapthist(rot_img, clip_limit=0.01)
-    edges = feature.canny(img_eq, sigma=1.5, low_threshold=0.05, high_threshold=0.2)
-
-    h, theta, d = transform.hough_line(edges)
-    # ask for more peaks to help clustering
-    acc, ang, dist = transform.hough_line_peaks(h, theta, d, num_peaks=40)
-    if acc is None or len(acc) == 0:
-        raise RuntimeError("No Hough lines found.")
-
-    line_angles = ang - np.pi/2
-
-    # accept near 0° OR near ±π as horizontal
-    tol = math.radians(angle_tol_deg)
-    def is_horizontal(a: float) -> bool:
-        a_wrapped = ((a + math.pi) % (2 * math.pi)) - math.pi  # [-π, π]
-        return (abs(a_wrapped) < tol) or (abs(abs(a_wrapped) - math.pi) < tol)
-
-    sel = [i for i in range(len(acc)) if is_horizontal(line_angles[i])]
-    if not sel:
-        # wider tolerance fallback
-        tol2 = math.radians(max(20, angle_tol_deg))
-        def is_horizontal_wide(a: float) -> bool:
-            a_wrapped = ((a + math.pi) % (2 * math.pi)) - math.pi
-            return (abs(a_wrapped) < tol2) or (abs(abs(a_wrapped) - math.pi) < tol2)
-        sel = [i for i in range(len(acc)) if is_horizontal_wide(line_angles[i])]
-    if not sel:
-        raise RuntimeError("No near-horizontal lines found.")
-
-    cand = [(float(acc[i]), float(line_angles[i]), float(dist[i])) for i in sel]
-    cand.sort(key=lambda t: t[0], reverse=True)
-
-    def build_clusters(candidates, rho_thresh):
-        clusters = []
-        for a, angle, rho in candidates:
-            placed = False
-            for cl in clusters:
-                if abs(rho - cl["rho_mean"]) < rho_thresh:
-                    cl["members"].append((a, angle, rho))
-                    cl["rho_mean"] = float(np.mean([m[2] for m in cl["members"]]))
-                    placed = True
-                    break
-            if not placed:
-                clusters.append({"members":[(a,angle,rho)], "rho_mean": float(rho)})
-        return clusters
-
-    # try standard clustering
-    clusters = build_clusters(cand, rho_thresh=4.0)
-    if len(clusters) < 3:
-        # relax clustering threshold
-        clusters = build_clusters(cand, rho_thresh=8.0)
-
-    if len(clusters) < 3:
-        # last-resort: pick top 3 peaks with distinct rhos (>= 8 px apart)
-        distinct = []
-        used_rhos = []
-        for a, angle, rho in cand:
-            if all(abs(rho - r) >= 8.0 for r in used_rhos):
-                distinct.append({"members":[(a, angle, rho)], "rho_mean": rho})
-                used_rhos.append(rho)
-            if len(distinct) == 3:
-                break
-        clusters = distinct
-
-    if len(clusters) < 3:
-        raise RuntimeError("Fewer than 3 horizontal clusters found.")
-
-    # keep strongest 3 clusters
-    clusters.sort(key=lambda cl: sum(m[0] for m in cl["members"]), reverse=True)
-    clusters = clusters[:3]
-
-    # Convert clusters to y=mx+b via weighted average
-    lines_mb = []
-    for cl in clusters:
-        w = np.array([m[0] for m in cl["members"]])
-        angs = np.array([m[1] for m in cl["members"]])
-        rhos = np.array([m[2] for m in cl["members"]])
-        ang = float(np.average(angs, weights=w))
-        rho = float(np.average(rhos, weights=w))
-        theta0 = ang + np.pi/2
-        s = math.sin(theta0)
-        c = math.cos(theta0)
-        if abs(s) < 1e-3:
-            continue
-        m = -c / s
-        b = rho / s
-        lines_mb.append((float(m), float(b)))
-
-    if len(lines_mb) < 3:
-        raise RuntimeError("Fewer than 3 valid lines.")
-
-    # Enforce common slope and consistent intercepts
-    m_common = float(np.median([mb[0] for mb in lines_mb]))
-    xs = np.linspace(0, rot_img.shape[1]-1, 60)
-    bs = []
-    for m, b in lines_mb:
-        ys = m*xs + b
-        b_fix = float(np.median(ys - m_common*xs))
-        bs.append(b_fix)
-    bs = np.array(bs, float)
-    return m_common, bs
-
-
-# --------------------- relabeling & geometry ---------------------
-
-def relabel_lines_by_geometry(
+def relabel_lines_scale_free(
     m: float,
     bs: np.ndarray,
     Wt_nm: float,
     Wb_nm: float,
     theta_deg: float,
     phi_deg: float,
-    verbose: bool = True
-) -> Tuple[np.ndarray, Dict[str, float]]:
+    t_min_nm: float,
+    t_max_nm: float,
+    prefer_positive: bool = True,
+    verbose: bool = True,
+) -> Tuple[np.ndarray, Dict]:
     """
-    Given three intercepts 'bs' (unordered), choose the two top lines as the pair whose
-    spacing is the median of the three, and compute scales with φ (true azimuth).
-    Returns bs_ordered = [b_top_far, b_top_near, b_bottom].
+    Enumerate all labelings [farTop, nearTop, bottom] among 3 lines,
+    compute scale-free thickness, and pick the best by plausibility score.
     """
-    assert len(bs) == 3, "Expected exactly 3 lines."
-    denom = math.sqrt(1.0 + m*m)
+    assert len(bs) == 3
+    denom = math.sqrt(1.0 + m * m)
 
-    pairs = [(0,1), (0,2), (1,2)]
-    dists_px = {p: abs((bs[p[1]] - bs[p[0]])/denom) for p in pairs}
+    candidates = []
+    # Since lines are sorted by y-intercept (top to bottom), enforce physical ordering:
+    # farTop (index 0, topmost) < nearTop (index 1, middle) < bottom (index 2, bottommost)
+    # Only consider assignments where: far < near < bottom in terms of indices
+    # Verify y-intercepts are in correct order (should be true after sorting in detect_lines)
+    assert bs[0] < bs[1] < bs[2], f"Lines not properly sorted: bs={bs}"
+    for far, near, bottom in [(0, 1, 2)]:  # Only one valid ordering after sorting
+        # distances along normal
+        dT = abs((bs[near] - bs[far]) / denom)   # top-top
+        dNB = abs((bs[near] - bs[bottom]) / denom)    # nearTop-bottom
 
-    proj = math.cos(math.radians(theta_deg)) * math.cos(math.radians(phi_deg))  # uses φ (true)
-    target_top_nm = Wt_nm * proj
+        t_nm = thickness_scale_free(dT, dNB, Wt_nm, Wb_nm, theta_deg, phi_deg)
 
-    # robustly choose top pair as median distance
-    vals = {p: dists_px[p] for p in pairs}
-    median_val = float(np.median(list(vals.values())))
-    top_pair = min(pairs, key=lambda p: abs(vals[p] - median_val))
+        # score
+        score = 0.0
+        if not np.isfinite(t_nm):
+            score += 1e9
+        else:
+            # enforce range
+            if not (t_min_nm <= abs(t_nm) <= t_max_nm):
+                score += 1e6 + 1e3 * min(abs(abs(t_nm) - t_min_nm), abs(abs(t_nm) - t_max_nm))
 
-    px_per_nm_v = dists_px[top_pair] / max(target_top_nm, 1e-9)
-    i_far_top, i_near_top = top_pair
-    i_bottom = ({0,1,2} - set(top_pair)).pop()
+            # prefer positive thickness
+            if prefer_positive and t_nm < 0:
+                score += 1e4
 
-    dT_px = dists_px[top_pair]
-    dFB_px = abs((bs[i_bottom] - bs[i_near_top]) / denom)
+            # penalize extreme ratios
+            r = dNB / max(dT, 1e-12)
+            if r <= 0:
+                score += 1e5
+            if r < 0.1 or r > 5.0:
+                score += 1e4
 
-    min_bottom_nm = 0.5*(Wt_nm + Wb_nm)*proj
-    min_bottom_px = min_bottom_nm * px_per_nm_v
+            # small regularizer
+            score += 0.01 * abs(t_nm)
 
-    swapped_top_roles = False
-    if dFB_px < 0.9 * min_bottom_px:
-        alt_dFB_px = abs((bs[i_bottom] - bs[i_far_top]) / denom)
-        if alt_dFB_px > dFB_px:
-            i_far_top, i_near_top = i_near_top, i_far_top
-            dFB_px = alt_dFB_px
-            swapped_top_roles = True
+        candidates.append({
+            "far": far, "near": near, "bottom": bottom,
+            "dT_px": float(dT), "dNB_px": float(dNB),
+            "ratio": float(dNB / max(dT, 1e-12)),
+            "t_nm": float(t_nm),
+            "score": float(score),
+        })
 
-    # enforce order so that dT_px > 0
-    b_far = float(bs[i_far_top])
-    b_near = float(bs[i_near_top])
-    if b_near <= b_far:
-        i_far_top, i_near_top = i_near_top, i_far_top
-        b_far, b_near = b_near, b_far
-        swapped_top_roles = True
+    candidates.sort(key=lambda c: c["score"])
+    best = candidates[0]
 
-    dFB_px = abs((bs[i_bottom] - bs[i_near_top]) / denom)
-    dT_px = abs((bs[i_near_top] - bs[i_far_top]) / denom)
-
-    bs_ordered = np.array([bs[i_far_top], bs[i_near_top], bs[i_bottom]], dtype=float)
+    bs_ordered = np.array([bs[best["far"]], bs[best["near"]], bs[best["bottom"]]], dtype=float)
 
     info = {
-        "proj": float(proj),
-        "target_top_nm": float(target_top_nm),
-        "pair01_px": float(dists_px[(0,1)]),
-        "pair02_px": float(dists_px[(0,2)]),
-        "pair12_px": float(dists_px[(1,2)]),
-        "chosen_top_pair": int( (0 if top_pair==(0,1) else 1 if top_pair==(0,2) else 2) ),
-        "px_per_nm_v_est": float(px_per_nm_v),
-        "dT_px": float(dT_px),
-        "dFB_px": float(dFB_px),
-        "min_bottom_nm_width_only": float(min_bottom_nm),
-        "min_bottom_px_width_only": float(min_bottom_px),
-        "swapped_top_roles": bool(swapped_top_roles),
-        "i_far_top": int(i_far_top),
-        "i_near_top": int(i_near_top),
-        "i_bottom": int(i_bottom),
+        "chosen_indices": {"far": best["far"], "near": best["near"], "bottom": best["bottom"]},
+        "dT_px": best["dT_px"],
+        "dNB_px": best["dNB_px"],
+        "ratio_dNB_over_dT": best["ratio"],
+        "thickness_nm": best["t_nm"],
+        "score": best["score"],
+        "all_candidates": candidates if verbose else None,
     }
+
     if verbose:
-        print("\n=== Geometry Debug ===")
-        print(f"phi_true_deg (used)       : {phi_deg:.3f}°")
-        print(f"theta_deg                 : {theta_deg:.3f}°")
-        print(f"proj = cosθ·cosφ          : {info['proj']:.6f}")
-        print(f"Wt*proj (nm)              : {info['target_top_nm']:.3f}")
-        print(f"Pair distances (px)       : (0,1)={info['pair01_px']:.3f}, (0,2)={info['pair02_px']:.3f}, (1,2)={info['pair12_px']:.3f}")
-        print(f"Chosen top pair idx code  : {info['chosen_top_pair']}  (0:(0,1), 1:(0,2), 2:(1,2))")
-        print(f"px_per_nm_v (from top)    : {info['px_per_nm_v_est']:.6f}")
-        print(f"dT_px (top pair)          : {info['dT_px']:.3f}")
-        print(f"dFB_px (nearTop→bottom)   : {info['dFB_px']:.3f}")
-        print(f"min bottom (nm,width-only): {info['min_bottom_nm_width_only']:.3f} nm  -> {info['min_bottom_px_width_only']:.3f} px")
-        print(f"Swapped top roles?        : {info['swapped_top_roles']}")
-        print(f"Indices (farTop, nearTop, bottom): ({info['i_far_top']}, {info['i_near_top']}, {info['i_bottom']})")
-        print("=======================\n")
+        print("\n=== Labeling (scale-free) ===")
+        for n, c in enumerate(candidates[:6]):
+            print(f"[{n}] far={c['far']} near={c['near']} bot={c['bottom']} | "
+                  f"dT={c['dT_px']:.3f}px dNB={c['dNB_px']:.3f}px r={c['ratio']:.3f} | "
+                  f"t={c['t_nm']:.2f} nm | score={c['score']:.2f}")
+        print(f"--> CHOSEN: far={best['far']} near={best['near']} bottom={best['bottom']} | t={best['t_nm']:.2f} nm")
+        print("=============================\n")
 
     return bs_ordered, info
 
 
-# --------------------- compute & plots ---------------------
+# =============================================================================
+# PLOTTING
+# =============================================================================
 
-def compute_thickness(m: float, bs: np.ndarray, Wt_nm: float, Wb_nm: float, 
-                      theta_deg: float, phi_deg: float) -> dict:
-    """Compute thickness using projection formulas (sign-robust), using φ (true)."""
-    theta = math.radians(theta_deg)
-    phi = math.radians(phi_deg)
-    denom = math.sqrt(1.0 + m * m)
+def draw_fitted_line_matplotlib(ax, fit, img_shape, color='r', linewidth=2):
+    """Draw a fitted line on matplotlib axis."""
+    vx, vy, x0, y0, _ = fit
+    h, w = img_shape[:2]
 
-    b_top, b_mid, b_bot = float(bs[0]), float(bs[1]), float(bs[2])
-    dT_px = (b_mid - b_top) / denom
-    dFB_px = (b_bot - b_mid) / denom
+    if abs(vx) < 1e-6:
+        ax.plot([x0, x0], [0, h - 1], color=color, linewidth=linewidth, alpha=0.8)
+        return
 
-    proj = math.cos(theta) * math.cos(phi)
-    s_px_per_nm = dT_px / (Wt_nm * proj)  # vertical px per nm
+    t0 = (0 - x0) / vx
+    t1 = ((w - 1) - x0) / vx
+    y_at_0 = y0 + t0 * vy
+    y_at_w = y0 + t1 * vy
+    ax.plot([0, w - 1], [y_at_0, y_at_w], color=color, linewidth=linewidth, alpha=0.8)
 
-    min_bottom_px = 0.5 * (Wt_nm + Wb_nm) * proj * s_px_per_nm
 
-    if dFB_px < min_bottom_px:
-        t_mag_nm = (min_bottom_px - dFB_px) / (s_px_per_nm * max(math.sin(theta), 1e-12))
-        sign = +1  # bottom projects toward the top pair
+def plot_overlay(img: np.ndarray, fits: List,
+                 theta_deg: float, phi_deg: float, psi_deg: float,
+                 t_nm: float, labeling: Dict, debug_info: dict = None):
+    """
+    Plot image with detected lines overlay.
+    Uses the actual fitted lines (vx, vy, x0, y0) to draw correctly.
+    """
+    h, w = img.shape[:2]
+    
+    n_panels = 4 if debug_info else 1
+    fig, axes = plt.subplots(n_panels, 1, figsize=(14, 4 * n_panels))
+    if n_panels == 1:
+        axes = [axes]
+    
+    if debug_info:
+        # Panel 1: Original
+        axes[0].imshow(img, cmap='gray')
+        axes[0].set_title('1. Original Image')
+        axes[0].axis('off')
+        
+        # Panel 2: Preprocessed
+        axes[1].imshow(debug_info.get('preprocessed', img), cmap='gray')
+        axes[1].set_title('2. Preprocessed (CLAHE + bilateral + MORPH_CLOSE)')
+        axes[1].axis('off')
+        
+        # Panel 3: Edges
+        axes[2].imshow(debug_info.get('edges', img), cmap='gray')
+        axes[2].set_title('3. Canny Edges')
+        axes[2].axis('off')
+        
+        ax_final = axes[3]
     else:
-        t_mag_nm = (dFB_px - min_bottom_px) / (s_px_per_nm * max(math.sin(theta), 1e-12))
-        sign = -1  # bottom projects away
-
-    t_nm = sign * t_mag_nm
-
-    return {
-        "dT_px": float(dT_px),
-        "dFB_px": float(dFB_px),
-        "px_per_nm_v": float(s_px_per_nm),
-        "thickness_nm": float(t_nm),
-    }
-
-
-def plot_overlay(rot_img: np.ndarray, m: float, bs: np.ndarray, 
-                 Wt: float, Wb: float, theta_deg: float, phi_true_deg: float, psi_deg: float) -> dict:
-    """Plot overlay with detected lines and model using φ (true) and showing ψ (image)."""
-    res = compute_thickness(m, bs, Wt, Wb, theta_deg, phi_true_deg)
-
-    denom = math.sqrt(1.0 + m * m)
-    proj = math.cos(math.radians(theta_deg)) * math.cos(math.radians(phi_true_deg))
-    dT_model_px = res["px_per_nm_v"] * (Wt * proj)
-    dFB_model_px = res["px_per_nm_v"] * (0.5 * (Wt + Wb) * proj + res["thickness_nm"] * math.sin(math.radians(theta_deg)))
-    dTN_model_px = dFB_model_px - dT_model_px
-
-    b_mid = float(bs[1])
-    b_top = b_mid - dT_model_px * denom
-    b_bot = b_mid + dTN_model_px * denom
-
-    X = np.linspace(0, rot_img.shape[1] - 1, 400)
-
-    # Calculate figure size: maintain image aspect ratio, add fixed padding amounts
-    rot_h, rot_w = rot_img.shape[:2]
-    aspect_ratio = rot_w / rot_h
+        ax_final = axes[0]
     
-    # Base image size (maintains aspect ratio)
-    base_width = 10
-    base_height = base_width / aspect_ratio
+    # Final panel: Image with detected lines using the actual fits
+    ax_final.imshow(img, cmap='gray')
     
-    # Add fixed padding amounts (same absolute amount on all sides)
-    padding = 1.0  # inches of padding on each side
-    fig_width = base_width + 2 * padding
-    fig_height = base_height + 2 * padding
+    # Get ordered indices from labeling
+    idx_order = [labeling["far"], labeling["near"], labeling["bottom"]]
+    colors = ['r', 'b', 'g']  # Red=farTop, Blue=nearTop, Green=bottom
+    labels = ['farTop', 'nearTop', 'bottom']
     
-    fig = plt.figure(figsize=(fig_width, fig_height))
-    ax = fig.add_subplot(111)
-    # Position axes to center the image with fixed padding
-    pad_frac = padding / fig_width  # horizontal padding fraction
-    pad_frac_v = padding / fig_height  # vertical padding fraction
-    fig.subplots_adjust(left=pad_frac, right=1-pad_frac, top=1-pad_frac_v, bottom=pad_frac_v)
+    for j, idx in enumerate(idx_order):
+        fit = fits[idx]
+        color = colors[j % len(colors)]
+        label = labels[j % len(labels)]
+        draw_fitted_line_matplotlib(ax_final, fit, img.shape, color=color, linewidth=2)
+        # Add label near the line
+        vx, vy, x0, y0, angle = fit
+        if abs(vx) > 1e-6:
+            m = vy / vx
+            b = y0 - m * x0
+            ax_final.text(w - 50, m * (w - 50) + b, label, color=color, fontsize=10, 
+                         fontweight='bold', va='center')
     
-    ax.imshow(rot_img, cmap="gray")
-    # Detected lines (red) only
-    for j, b in enumerate(bs):
-        ax.plot(X, m * X + b, linewidth=1, color="red", label="Detected" if j == 0 else "")
-
-    t_abs = abs(res['thickness_nm'])
-    ax.set_title(f"Thickness ≈ {t_abs:.0f} nm | θ={theta_deg:.1f}°, φ(true)={phi_true_deg:.2f}°, ψ(img)={psi_deg:.2f}°")
-    ax.legend()
-    ax.set_axis_off()
-    ax.set_xlim(0, rot_w)
-    ax.set_ylim(rot_h, 0)  # Image coordinates: y increases downward
+    ax_final.set_title(f"t ≈ {t_nm:.1f} nm | θ_tilt={theta_deg:.1f}°, φ={phi_deg:.2f}°, ψ_line={psi_deg:.2f}°")
+    ax_final.set_axis_off()
+    ax_final.set_xlim(0, w)
+    ax_final.set_ylim(h, 0)
+    
+    plt.tight_layout()
+    plt.savefig('overlay.png', dpi=150, bbox_inches='tight')
+    print("Saved overlay.png")
     plt.show()
-    return res
 
 
 def build_trapezoid_prism_vertices(Wt: float, Wb: float, t: float, L: float) -> np.ndarray:
-    """Build trapezoid prism vertices aligned along y-axis."""
-    top_left  = np.array([-Wt/2, 0,  t/2])
-    top_right = np.array([ Wt/2, 0,  t/2])
-    bot_right = np.array([ Wb/2, 0, -t/2])
-    bot_left  = np.array([-Wb/2, 0, -t/2])
+    top_left = np.array([-Wt / 2, 0, t / 2])
+    top_right = np.array([Wt / 2, 0, t / 2])
+    bot_right = np.array([Wb / 2, 0, -t / 2])
+    bot_left = np.array([-Wb / 2, 0, -t / 2])
     verts = np.array([
         top_left, top_right, bot_right, bot_left,
         top_left + [0, L, 0], top_right + [0, L, 0], bot_right + [0, L, 0], bot_left + [0, L, 0]
@@ -399,257 +463,183 @@ def build_trapezoid_prism_vertices(Wt: float, Wb: float, t: float, L: float) -> 
 
 
 def plot_prism(ax, V: np.ndarray):
-    """Plot 3D trapezoid prism."""
     faces = [
-        [V[0], V[1], V[2], V[3]],  # front
-        [V[4], V[5], V[6], V[7]],  # back
-        [V[0], V[1], V[5], V[4]],  # top
-        [V[3], V[2], V[6], V[7]],  # bottom
-        [V[1], V[2], V[6], V[5]],  # right
-        [V[0], V[3], V[7], V[4]],  # left
+        [V[0], V[1], V[2], V[3]],
+        [V[4], V[5], V[6], V[7]],
+        [V[0], V[1], V[5], V[4]],
+        [V[3], V[2], V[6], V[7]],
+        [V[1], V[2], V[6], V[5]],
+        [V[0], V[3], V[7], V[4]],
     ]
-    pc = Poly3DCollection(faces, facecolors=[(0.7,0.8,1,0.6)], edgecolors='k', linewidths=0.8)
+    pc = Poly3DCollection(faces, facecolors=[(0.7, 0.8, 1, 0.6)], edgecolors="k", linewidths=0.8)
     ax.add_collection3d(pc)
 
 
-def visualize_3d(Wt: float, Wb: float, t: float, L: float, theta_deg: float, phi_true_deg: float, psi_deg: float):
-    """Show 3D trapezoid prism; set camera using θ and φ(true)."""
+def visualize_3d(Wt: float, Wb: float, t: float, L: float, 
+                 theta_deg: float, phi_deg: float, psi_deg: float):
     V = build_trapezoid_prism_vertices(Wt, Wb, t, L)
     fig = plt.figure(figsize=(10, 7))
-    ax = fig.add_subplot(111, projection='3d')
+    ax = fig.add_subplot(111, projection="3d")
     plot_prism(ax, V)
 
-    ax.set_xlabel('x (width, nm)')
-    ax.set_ylabel('y (length, nm)')
-    ax.set_zlabel('z (thickness, nm)')
-    ax.set_title(f'Trapezoid Prism (θ={theta_deg:.1f}°, φ(true)={phi_true_deg:.2f}°, ψ(img)={psi_deg:.2f}°, t={t:.0f} nm)')
+    ax.set_xlabel("x (nm)")
+    ax.set_ylabel("y (nm)")
+    ax.set_zlabel("z (nm)")
+    ax.set_title(f"θ={theta_deg:.1f}°, φ={phi_deg:.2f}°, ψ={psi_deg:.2f}°, t={t:.1f} nm")
 
-    # Equal aspect
     ranges = V.max(axis=0) - V.min(axis=0)
     max_range = ranges.max()
-    mins = V.min(axis=0)
-    centers = mins + ranges / 2
+    centers = V.min(axis=0) + ranges / 2
     ax.set_box_aspect([1, 1, 1])
-    ax.set_xlim(centers[0]-max_range/2, centers[0]+max_range/2)
-    ax.set_ylim(centers[1]-max_range/2, centers[1]+max_range/2)
-    ax.set_zlim(centers[2]-max_range/2, centers[2]+max_range/2)
+    ax.set_xlim(centers[0] - max_range / 2, centers[0] + max_range / 2)
+    ax.set_ylim(centers[1] - max_range / 2, centers[1] + max_range / 2)
+    ax.set_zlim(centers[2] - max_range / 2, centers[2] + max_range / 2)
 
-    # Camera: elevation tied to θ, azimuth tied to φ(true)
-    camera_elev = 90 - theta_deg
-    camera_azim = phi_true_deg
-    ax.view_init(elev=camera_elev, azim=camera_azim)
-
+    ax.view_init(elev=90 - theta_deg, azim=phi_deg)
     plt.tight_layout()
     plt.show()
 
 
-# --------------------- PNG overlay saving ---------------------
-
-def save_png_overlay(rot_img: np.ndarray, m: float, bs: np.ndarray,
-                     Wt: float, Wb: float, theta_deg: float, phi_true_deg: float,
-                     thickness_nm: float, out_path: str = "overlay.png", dpi: int = 300):
-    """
-    Save PNG overlay on ROTATED image with detected lines only.
-    """
-    import matplotlib as mpl
-    mpl.use('Agg')  # Use non-GUI backend for PNG generation
-    import matplotlib.pyplot as plt
-
-    rot_h, rot_w = rot_img.shape[:2]
-    fig_w_in = 10
-    fig_h_in = fig_w_in * (rot_h / rot_w)
-    
-    fig = plt.figure(figsize=(fig_w_in, fig_h_in), dpi=dpi)
-    ax = plt.Axes(fig, [0, 0, 1, 1])
-    fig.add_axes(ax)
-    
-    # Background: rotated image
-    ax.imshow(rot_img, cmap="gray", interpolation="nearest")
-    
-    X = np.linspace(0, rot_w - 1, 400)
-    
-    # Detected lines (red) only
-    for j, b in enumerate(bs):
-        ax.plot(X, m * X + b, linewidth=1.5, color="red", label="Detected" if j == 0 else "")
-    
-    t_abs = abs(thickness_nm)
-    ax.set_title(f"Thickness ≈ {t_abs:.0f} nm | θ={theta_deg:.1f}°, φ(true)={phi_true_deg:.2f}°")
-    ax.legend()
-    ax.set_axis_off()
-    ax.set_xlim(0, rot_w)
-    ax.set_ylim(rot_h, 0)
-    
-    fig.savefig(out_path, dpi=dpi, transparent=False, bbox_inches='tight')
-    plt.close(fig)
-
-
-# --------------------- main ---------------------
+# =============================================================================
+# MAIN
+# =============================================================================
 
 def main():
-    ap = argparse.ArgumentParser(description="Automatic thickness extraction with uncertainty propagation")
+    ap = argparse.ArgumentParser(description="Scale-free thickness extraction from tilted SEM (v4)")
     ap.add_argument("--image", default="cavity_sem_45degree.png", help="SEM image path")
     ap.add_argument("--wt", type=float, default=238.0, help="Top width Wt (nm)")
     ap.add_argument("--wb", type=float, default=314.0, help="Bottom width Wb (nm)")
-    ap.add_argument("--wt-std", type=float, default=10.0, help="Uncertainty (std) of Wt (nm)")
-    ap.add_argument("--wb-std", type=float, default=10.0, help="Uncertainty (std) of Wb (nm)")
-    ap.add_argument("--mc-samples", type=int, default=2000, help="Number of Monte Carlo samples")
-    ap.add_argument("--seed", type=int, default=0, help="Random seed for Monte Carlo")
-    ap.add_argument("--theta", type=float, default=45.0, help="Tilt elevation (deg)")
-    ap.add_argument("--length", type=float, default=4000.0, help="Prism length (nm)")
-    ap.add_argument("--no-plots", action="store_true", help="Disable plots for faster batch runs")
+    ap.add_argument("--wt-std", type=float, default=10.0, help="Std of Wt for MC (nm)")
+    ap.add_argument("--wb-std", type=float, default=10.0, help="Std of Wb for MC (nm)")
+    ap.add_argument("--mc-samples", type=int, default=2000, help="MC samples for uncertainty")
+    ap.add_argument("--seed", type=int, default=0, help="RNG seed")
+    ap.add_argument("--theta", type=float, default=45.0, help="Tilt angle θ (deg)")
+    ap.add_argument("--length", type=float, default=4000.0, help="3D prism length (nm)")
+
+    ap.add_argument("--t-min", type=float, default=20.0, help="Min plausible |t| (nm)")
+    ap.add_argument("--t-max", type=float, default=400.0, help="Max plausible |t| (nm)")
+    ap.add_argument("--allow-negative", action="store_true", help="Allow negative t")
+
+    ap.add_argument("--no-plots", action="store_true", help="Disable plots")
+    ap.add_argument("--debug", action="store_true", help="Enable debug output")
+    
+    # Line detection parameters
+    ap.add_argument("--hough-threshold", type=int, default=40, help="HoughLinesP threshold")
+    ap.add_argument("--min-line-length", type=int, default=200, help="HoughLinesP minLineLength")
+    ap.add_argument("--max-line-gap", type=int, default=20, help="HoughLinesP maxLineGap")
+    ap.add_argument("--intercept-tol", type=float, default=4.0, help="Tolerance for grouping by intercept (px)")
+    
     args = ap.parse_args()
 
-    # Load image with better error handling
     import os
     if not os.path.exists(args.image):
-        print(f"ERROR: Image file not found: {args.image}")
-        print(f"Current working directory: {os.getcwd()}")
-        print(f"Please check the image path or run from the correct directory.")
-        return
+        raise FileNotFoundError(f"Image not found: {args.image}")
+
+    # Load image
+    print(f"Loading image: {args.image}")
+    gray = read_gray(args.image)
+    print(f"Image shape: {gray.shape}, dtype: {gray.dtype}")
+
+    # Detect lines using the robust approach
+    psi_deg, bs_raw, debug_info = detect_lines(
+        gray,
+        n_lines=3,
+        hough_threshold=args.hough_threshold,
+        min_line_length=args.min_line_length,
+        max_line_gap=args.max_line_gap,
+        intercept_tol=args.intercept_tol,
+        debug=True
+    )
     
-    try:
-        img = io.imread(args.image)
-        print(f"Loaded image: {args.image} (shape: {img.shape})")
-    except Exception as e:
-        print(f"ERROR: Failed to load image '{args.image}': {e}")
-        return
+    # Compute slope from angle
+    m_common = math.tan(math.radians(psi_deg))
     
-    try:
-        gray = to_gray(img)
-        gray = exposure.equalize_adapthist(gray, clip_limit=0.01)
-    except Exception as e:
-        print(f"ERROR: Failed to process image: {e}")
-        return
+    print(f"Detected line angle ψ: {psi_deg:.3f}°")
+    print(f"Detected line intercepts (sorted by y): {np.array2string(bs_raw, precision=2)}")
+    print(f"Common slope m: {m_common:.3e}")
 
-    # 1) Measure *image* angle ψ
-    psi_deg = estimate_azimuth(gray)
-    print(f"Detected image angle ψ: {psi_deg:.2f}°")
+    # Compute true azimuth phi from image angle psi
+    phi_deg = azimuth_from_image_angle(psi_deg, args.theta)
+    print(f"Recovered true azimuth φ: {phi_deg:.3f}°")
 
-    # 2) Rotate image: use proven working angle when ψ is reasonable (kept consistent with v3)
-    if abs(psi_deg) < 10:
-        rotation_angle = -2.8
-        print(f"Rotating image by {rotation_angle:.2f}° (ψ was {psi_deg:.2f}°)")
-    else:
-        rotation_angle = -2.8
-        print(f"Rotating image by known working angle {rotation_angle:.2f}° (ψ was {psi_deg:.2f}°)")
-    rot = transform.rotate(gray, rotation_angle, resize=True, preserve_range=True, mode="constant", cval=0)
-
-    # 3) Recover true azimuth φ from ψ and θ; use φ in projection math
-    phi_true_deg = azimuth_from_image_angle(psi_deg, args.theta)
-    print(f"Recovered true azimuth φ: {phi_true_deg:.2f}° (from ψ and θ)")
-
-    # Detect lines on rotated image with error handling
-    try:
-        m_common, bs_raw = detect_horizontal_lines(rot)
-        print(f"Detected (unordered) line intercepts b: {np.array2string(bs_raw, precision=3)}")
-    except RuntimeError as e:
-        print(f"ERROR: Line detection failed: {e}")
-        print(f"This usually means the image doesn't have clear horizontal lines.")
-        print(f"Try:")
-        print(f"  1. Check that the image has visible horizontal edges")
-        print(f"  2. Try a different image or adjust the rotation angle")
-        print(f"  3. Check image quality and contrast")
-        return
-    except Exception as e:
-        print(f"ERROR: Unexpected error during line detection: {e}")
-        import traceback
-        traceback.print_exc()
-        return
-
-    # Relabel based on geometry using φ(true) with nominal widths
-    bs, dbg = relabel_lines_by_geometry(
+    # Relabel lines using scale-free scoring
+    bs_ordered, dbg = relabel_lines_scale_free(
         m=m_common,
         bs=bs_raw,
         Wt_nm=args.wt,
         Wb_nm=args.wb,
         theta_deg=args.theta,
-        phi_deg=phi_true_deg,
-        verbose=True
+        phi_deg=phi_deg,
+        t_min_nm=args.t_min,
+        t_max_nm=args.t_max,
+        prefer_positive=(not args.allow_negative),
+        verbose=True,
     )
-    print(f"Ordered lines [farTop, nearTop, bottom] b: {np.array2string(bs, precision=3)}")
+    t_nominal = float(dbg["thickness_nm"])
+    print(f"Chosen thickness (nominal): {t_nominal:.3f} nm")
 
-    # Compute thickness with nominal widths
-    res_nominal = compute_thickness(m_common, bs, args.wt, args.wb, args.theta, phi_true_deg)
-    t_nm_nominal = abs(float(res_nominal["thickness_nm"])) if np.isfinite(res_nominal["thickness_nm"]) else 0.0
-    
-    # Show plots if not disabled
-    if not args.no_plots:
-        print("Generating 2D overlay plot...")
-        _ = plot_overlay(rot, m_common, bs, args.wt, args.wb, args.theta, phi_true_deg, psi_deg)
-        print("Generating 3D visualization...")
-        visualize_3d(args.wt, args.wb, t_nm_nominal, args.length, args.theta, phi_true_deg, psi_deg)
-        print("Plots should be displayed now!")
-
-    # Save overlay matching the plot
-    print("\n=== Saving Overlay ===")
-    
-    # PNG overlay on rotated image (matching plot_overlay)
-    png_out = "overlay.png"
-    save_png_overlay(
-        rot_img=rot,
-        m=m_common,
-        bs=bs,
-        Wt=args.wt,
-        Wb=args.wb,
-        theta_deg=args.theta,
-        phi_true_deg=phi_true_deg,
-        thickness_nm=t_nm_nominal,
-        out_path=png_out,
-        dpi=300,
-    )
-    print(f"PNG overlay saved to: {png_out}")
-    print("==========================================\n")
-
-    # Monte Carlo propagation for Wt/Wb uncertainties (geometry fixed: m, bs, θ, φ)
+    # Monte Carlo uncertainty from Wt/Wb
     rng = np.random.default_rng(args.seed)
     if args.mc_samples > 0 and (args.wt_std > 0 or args.wb_std > 0):
-        Wt_samples = rng.normal(loc=args.wt, scale=max(args.wt_std, 0.0), size=args.mc_samples)
-        Wb_samples = rng.normal(loc=args.wb, scale=max(args.wb_std, 0.0), size=args.mc_samples)
-        # enforce positive widths
-        Wt_samples = np.clip(Wt_samples, 1e-9, None)
-        Wb_samples = np.clip(Wb_samples, 1e-9, None)
+        Wt_samples = rng.normal(args.wt, max(args.wt_std, 0.0), size=args.mc_samples)
+        Wb_samples = rng.normal(args.wb, max(args.wb_std, 0.0), size=args.mc_samples)
+        Wt_samples = np.clip(Wt_samples, 1e-6, None)
+        Wb_samples = np.clip(Wb_samples, 1e-6, None)
+
+        dT_px = dbg["dT_px"]
+        dNB_px = dbg["dNB_px"]
 
         t_samples = np.empty(args.mc_samples, dtype=float)
         for i in range(args.mc_samples):
-            res_i = compute_thickness(m_common, bs, float(Wt_samples[i]), float(Wb_samples[i]), args.theta, phi_true_deg)
-            t_samples[i] = float(res_i["thickness_nm"])
+            t_samples[i] = thickness_scale_free(
+                dT_px, dNB_px,
+                float(Wt_samples[i]), float(Wb_samples[i]),
+                args.theta, phi_deg
+            )
 
         t_mean = float(np.mean(t_samples))
         t_std = float(np.std(t_samples, ddof=1)) if args.mc_samples > 1 else 0.0
         t_p05, t_p50, t_p95 = [float(q) for q in np.percentile(t_samples, [5, 50, 95])]
     else:
-        t_samples = np.array([res_nominal["thickness_nm"]], dtype=float)
-        t_mean = float(t_samples[0])
+        t_samples = np.array([t_nominal], dtype=float)
+        t_mean = float(t_nominal)
         t_std = 0.0
-        t_p05 = t_p50 = t_p95 = float(t_samples[0])
+        t_p05 = t_p50 = t_p95 = float(t_nominal)
 
-    # Results payload
+    # Output
     out = {
         "input_file": args.image,
-        "detected_image_angle_deg": float(psi_deg),
-        "true_azimuth_deg": float(phi_true_deg),
-        "rotation_angle_deg": float(rotation_angle),
+        "wt_nm": args.wt,
+        "wb_nm": args.wb,
+        "theta_deg": args.theta,
+        "psi_deg": float(psi_deg),
+        "phi_deg": float(phi_deg),
         "m_common": float(m_common),
-        "b_top_mid_bot": [float(bs[0]), float(bs[1]), float(bs[2])],
-        "wt_nm": float(args.wt),
-        "wb_nm": float(args.wb),
-        "wt_std_nm": float(args.wt_std),
-        "wb_std_nm": float(args.wb_std),
+        "b_raw": [float(x) for x in bs_raw],
+        "b_ordered_far_near_bottom": [float(x) for x in bs_ordered],
+        "dT_px": float(dbg["dT_px"]),
+        "dNB_px": float(dbg["dNB_px"]),
+        "ratio_dNB_over_dT": float(dbg["ratio_dNB_over_dT"]),
+        "thickness_nm": float(t_nominal),
         "mc_samples": int(args.mc_samples),
-        **{k: float(v) for k, v in res_nominal.items()},
-        "thickness_mean_nm": t_mean,
-        "thickness_std_nm": t_std,
-        "thickness_p05_nm": t_p05,
-        "thickness_p50_nm": t_p50,
-        "thickness_p95_nm": t_p95,
-        "debug": dbg
+        "thickness_mean_nm": float(t_mean),
+        "thickness_std_nm": float(t_std),
+        "thickness_p05_nm": float(t_p05),
+        "thickness_p50_nm": float(t_p50),
+        "thickness_p95_nm": float(t_p95),
     }
 
     print("\nResults:")
     print(json.dumps(out, indent=2))
 
+    # Plots
+    if not args.no_plots:
+        # Pass the actual fits (from debug_info) and labeling info for correct drawing
+        fits = debug_info["fits"]
+        labeling = dbg["chosen_indices"]
+        plot_overlay(gray, fits, args.theta, phi_deg, psi_deg, t_nominal, labeling, debug_info)
+        visualize_3d(args.wt, args.wb, abs(t_nominal), args.length, args.theta, phi_deg, psi_deg)
+
 
 if __name__ == "__main__":
     main()
-
-
