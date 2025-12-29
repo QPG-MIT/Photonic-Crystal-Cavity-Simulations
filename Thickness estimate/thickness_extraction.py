@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Automatic thickness extraction from tilted SEM (scale-free) - Version 4.
+Automatic thickness extraction from tilted SEM (scale-free) - Version 2
 
 Uses the robust line detection approach from debug_rotation.py:
 1. CLAHE -> Bilateral -> MORPH_CLOSE (to fill holes) -> Canny -> HoughLinesP
@@ -11,11 +11,13 @@ Key features:
 - NO pixel scale needed: Uses scale-free formula
 - NO hard-coded rotation: Uses measured image angle
 - Robust line detection that handles surface holes/pits
+- Advanced prism visualization with face-based hidden-line removal (from visualize_structure.py)
 """
 
 import argparse
 import json
 import math
+from dataclasses import dataclass
 from typing import Tuple, Dict, List
 
 import cv2
@@ -25,6 +27,30 @@ matplotlib.use("MacOSX")
 import matplotlib.pyplot as plt
 
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+
+# Editable text in vector exports
+matplotlib.rcParams['svg.fonttype'] = 'none'
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype']  = 42
+
+
+# =============================================================================
+# DATA CLASSES (from visualize_structure.py)
+# =============================================================================
+
+@dataclass
+class PrismDims:
+    Wt: float  # top width (x extent at z=+t/2)
+    Wb: float  # bottom width (x extent at z=-t/2)
+    t: float   # thickness (z extent)
+    L: float   # length (y extent)
+
+@dataclass
+class View:
+    azim: float   # Matplotlib azimuth (deg) about world +z
+    elev: float   # Matplotlib elevation (deg)
+    mode: str = "ortho"  # 'ortho' or 'persp'
+    f: float = 2000.0    # focal length for perspective
 
 
 # =============================================================================
@@ -365,6 +391,151 @@ def relabel_lines_scale_free(
 
 
 # =============================================================================
+# PRISM GEOMETRY (from visualize_structure.py)
+# =============================================================================
+
+def prism_vertices(d: PrismDims) -> np.ndarray:
+    """Return 8x3 array of prism vertices."""
+    z_top = +d.t/2
+    z_bot = -d.t/2
+    xt = d.Wt/2
+    xb = d.Wb/2
+    y  = d.L/2
+
+    # Top (z=+t/2), CCW from (+x,+y)
+    v0 = np.array([+xt, +y, z_top])
+    v1 = np.array([-xt, +y, z_top])
+    v2 = np.array([-xt, -y, z_top])
+    v3 = np.array([+xt, -y, z_top])
+    # Bottom (z=-t/2), CCW from (+x,+y) seen from -z
+    v4 = np.array([+xb, +y, z_bot])
+    v5 = np.array([-xb, +y, z_bot])
+    v6 = np.array([-xb, -y, z_bot])
+    v7 = np.array([+xb, -y, z_bot])
+
+    return np.stack([v0,v1,v2,v3,v4,v5,v6,v7], axis=0)
+
+# Faces as index lists (quads) - CCW winding for outward normals
+FACES = [
+    [0,1,2,3],  # top - CCW from above (normal points up +z)
+    [4,7,6,5],  # bottom - CW from above = CCW from below (normal points down -z)
+    [0,4,5,1],  # side +y - CCW from outside +y (normal points +y)
+    [3,2,6,7],  # side -y - CCW from outside -y (normal points -y)
+    [1,5,6,2],  # side -x - CCW from outside -x (normal points -x)
+    [0,3,7,4],  # side +x - CCW from outside +x (normal points +x)
+]
+
+FACE_NAMES = [
+    "top",
+    "bottom",
+    "side +y",
+    "side -y",
+    "side -x",
+    "side +x"
+]
+
+def unique_edges_from_faces(faces: List[List[int]]) -> List[Tuple[int,int]]:
+    """Unique undirected edges from quads."""
+    edges = set()
+    for face in faces:
+        n = len(face)
+        for k in range(n):
+            i, j = face[k], face[(k+1) % n]
+            a, b = (i, j) if i < j else (j, i)
+            edges.add((a, b))
+    return list(edges)
+
+def edges_to_faces_map(faces: List[List[int]]) -> dict:
+    """
+    Create a mapping from edge (tuple of sorted vertex indices) to list of face indices.
+    
+    Returns:
+        Dictionary mapping (v1, v2) edge tuple -> list of face indices that contain this edge
+    """
+    edge_to_faces = {}
+    for face_idx, face in enumerate(faces):
+        n = len(face)
+        for k in range(n):
+            i, j = face[k], face[(k+1) % n]
+            edge = (i, j) if i < j else (j, i)
+            if edge not in edge_to_faces:
+                edge_to_faces[edge] = []
+            edge_to_faces[edge].append(face_idx)
+    return edge_to_faces
+
+def calculate_face_normal(vertices: np.ndarray, face_indices: List[int]) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Calculate the outward normal vector for a face.
+    
+    Args:
+        vertices: 8x3 array of all vertices
+        face_indices: List of vertex indices forming the face (CCW order)
+        
+    Returns:
+        (normal, center): normal vector (unit vector) and face center point
+    """
+    # Get face vertices
+    face_verts = vertices[face_indices]
+    
+    # Calculate center
+    center = np.mean(face_verts, axis=0)
+    
+    # Calculate normal using cross product of two edges
+    # Since vertices are CCW, (v1-v0) x (v2-v0) gives outward normal
+    v0, v1, v2 = face_verts[0], face_verts[1], face_verts[2]
+    edge1 = v1 - v0
+    edge2 = v2 - v0
+    normal = np.cross(edge1, edge2)
+    
+    # Normalize
+    norm = np.linalg.norm(normal)
+    if norm > 1e-10:
+        normal = normal / norm
+    else:
+        normal = np.array([0.0, 0.0, 1.0])  # fallback
+    
+    return normal, center
+
+
+# =============================================================================
+# CAMERA & PROJECTION (from visualize_structure.py)
+# =============================================================================
+
+def camera_axes_from_mpl(elev_deg: float, azim_deg: float) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
+    """Right-handed camera basis like mplot3d: right, up, forward (scene->camera)."""
+    e = math.radians(elev_deg)
+    a = math.radians(azim_deg)
+    vdir = np.array([math.cos(a)*math.cos(e), math.sin(a)*math.cos(e), math.sin(e)], dtype=float)
+    world_up = np.array([0.0, 0.0, 1.0], float)
+    right = np.cross(vdir, world_up)
+    if np.linalg.norm(right) < 1e-12:
+        right = np.array([1.0, 0.0, 0.0], float)
+    right /= np.linalg.norm(right)
+    up = np.cross(vdir, right); up /= np.linalg.norm(up)
+    forward = vdir / np.linalg.norm(vdir)
+    return right, up, forward
+
+def world_to_camera(P_world: np.ndarray, view: View) -> np.ndarray:
+    """World -> camera coords (u,v,w). Note azimuth sign flip to match earlier 2D convention."""
+    right, up, fwd = camera_axes_from_mpl(view.elev, -view.azim)
+    R_cam = np.stack([right, up, fwd], axis=0)
+    return (R_cam @ P_world.T).T
+
+def project_from_camera(P_cam: np.ndarray, view: View) -> Tuple[np.ndarray, np.ndarray]:
+    """Camera -> 2D projection (UV) and keep w."""
+    u, v, w = P_cam[:,0], P_cam[:,1], P_cam[:,2]
+    if view.mode == 'ortho':
+        UV = np.stack([u, -v], axis=1)  # flip v to match mplot3d
+    elif view.mode == 'persp':
+        eps = 1e-9
+        zc = np.maximum(w, eps)
+        UV = np.stack([view.f * u / zc, view.f * -v / zc], axis=1)
+    else:
+        raise ValueError("view.mode must be 'ortho' or 'persp'")
+    return UV, w
+
+
+# =============================================================================
 # PLOTTING
 # =============================================================================
 
@@ -450,54 +621,284 @@ def plot_overlay(img: np.ndarray, fits: List,
     plt.show()
 
 
-def build_trapezoid_prism_vertices(Wt: float, Wb: float, t: float, L: float) -> np.ndarray:
-    top_left = np.array([-Wt / 2, 0, t / 2])
-    top_right = np.array([Wt / 2, 0, t / 2])
-    bot_right = np.array([Wb / 2, 0, -t / 2])
-    bot_left = np.array([-Wb / 2, 0, -t / 2])
-    verts = np.array([
-        top_left, top_right, bot_right, bot_left,
-        top_left + [0, L, 0], top_right + [0, L, 0], bot_right + [0, L, 0], bot_left + [0, L, 0]
-    ], dtype=float)
-    return verts
+def plot_prism_2d(ax: plt.Axes, dims: PrismDims, view: View,
+                  lw_visible: float = 1.6,
+                  lw_hidden: float  = 1.2,
+                  dash_pattern: Tuple[float, float] = (5.0, 3.0),
+                  debug: bool = False,
+                  clean_export: bool = False) -> None:
+    """
+    Draw edges using face-based classification (from visualize_structure.py):
+      - visible (solid): edges between blue-blue or blue-red faces
+      - hidden (dashed): edges between two red faces
+    """
+    V = prism_vertices(dims)
+    P_cam = world_to_camera(V, view)
+    UV, w = project_from_camera(P_cam, view)
+
+    # Calculate camera direction vector - MUST match the one used in world_to_camera
+    right, up, forward = camera_axes_from_mpl(view.elev, -view.azim)
+    
+    # Calculate dot product for each face to determine if blue or red
+    face_colors_map = []  # True for blue (positive dot), False for red (negative dot)
+    
+    if debug:
+        print("\n" + "="*60)
+        print("FACE-BASED EDGE CLASSIFICATION")
+        print("="*60)
+        print("Face classification:")
+    
+    for i, face_indices in enumerate(FACES):
+        normal, _ = calculate_face_normal(V, face_indices)
+        dot_product = np.dot(normal, forward)
+        is_blue = dot_product > 0
+        face_colors_map.append(is_blue)
+        if debug:
+            color_name = "BLUE" if is_blue else "RED"
+            print(f"  Face {i}: dot={dot_product:+.4f} -> {color_name}")
+    
+    # Create edge-to-faces mapping
+    edge_to_faces = edges_to_faces_map(FACES)
+    edges = unique_edges_from_faces(FACES)
+    
+    if debug:
+        print(f"\nFound {len(edges)} unique edges")
+        print("\nEdge styling:")
+    
+    # Classify edges
+    solid_edges = []
+    dashed_edges = []
+    
+    for edge in edges:
+        v1, v2 = edge
+        # Find which faces this edge belongs to
+        face_indices = edge_to_faces.get(edge, [])
+        
+        if len(face_indices) == 2:
+            # Edge between two faces
+            face1_blue = face_colors_map[face_indices[0]]
+            face2_blue = face_colors_map[face_indices[1]]
+            
+            # Dashed if: (red, red) - both faces facing away from camera
+            # Solid if: (blue, blue) or (blue, red) or (red, blue)
+            if not face1_blue and not face2_blue:
+                # Both red -> dashed (hidden)
+                dashed_edges.append(edge)
+                if debug:
+                    print(f"  Edge {v1}-{v2}: RED-RED -> DASHED")
+            else:
+                # At least one blue -> solid (visible)
+                solid_edges.append(edge)
+                if debug:
+                    f1_type = "BLUE" if face1_blue else "RED"
+                    f2_type = "BLUE" if face2_blue else "RED"
+                    print(f"  Edge {v1}-{v2}: {f1_type}-{f2_type} -> SOLID")
+        else:
+            # Edge belongs to only one face (shouldn't happen for closed solid)
+            if debug:
+                print(f"  Edge {v1}-{v2}: WARNING - belongs to {len(face_indices)} faces")
+            solid_edges.append(edge)  # Default to solid
+    
+    if debug:
+        print(f"\nSummary: {len(solid_edges)} solid edges, {len(dashed_edges)} dashed edges")
+        print("="*60)
+    
+    # Draw dashed edges first (hidden)
+    for edge in dashed_edges:
+        v1, v2 = edge
+        ax.plot([UV[v1, 0], UV[v2, 0]], [UV[v1, 1], UV[v2, 1]],
+                color='k', lw=lw_hidden,
+                dashes=dash_pattern,
+                solid_capstyle='round', dash_capstyle='round', zorder=2)
+    
+    # Draw solid edges on top (visible)
+    for edge in solid_edges:
+        v1, v2 = edge
+        ax.plot([UV[v1, 0], UV[v2, 0]], [UV[v1, 1], UV[v2, 1]],
+                linestyle='-', color='k', lw=lw_visible,
+                solid_capstyle='round', zorder=3)
+
+    # Axes housekeeping
+    ax.set_aspect('equal', adjustable='datalim')
+    allx, ally = UV[:,0], UV[:,1]
+    cx, cy = np.mean(allx), np.mean(ally)
+    rng = max(allx.max()-allx.min(), ally.max()-ally.min()) * 0.55 + 1e-6
+    ax.set_xlim(cx - rng, cx + rng)
+    ax.set_ylim(cy - rng, cy + rng)
+    
+    if clean_export:
+        # Remove all decorations for clean export
+        ax.axis('off')  # Remove axes, labels, ticks, and frame
+        ax.set_facecolor('white')  # White background (or 'none' for transparent)
+    else:
+        ax.set_xlabel('u (camera x)')
+        ax.set_ylabel('v (camera -y)')
+        ax.grid(False)
 
 
-def plot_prism(ax, V: np.ndarray):
-    faces = [
-        [V[0], V[1], V[2], V[3]],
-        [V[4], V[5], V[6], V[7]],
-        [V[0], V[1], V[5], V[4]],
-        [V[3], V[2], V[6], V[7]],
-        [V[1], V[2], V[6], V[5]],
-        [V[0], V[3], V[7], V[4]],
-    ]
-    pc = Poly3DCollection(faces, facecolors=[(0.7, 0.8, 1, 0.6)], edgecolors="k", linewidths=0.8)
-    ax.add_collection3d(pc)
-
-
-def visualize_3d(Wt: float, Wb: float, t: float, L: float, 
-                 theta_deg: float, phi_deg: float, psi_deg: float):
-    V = build_trapezoid_prism_vertices(Wt, Wb, t, L)
-    fig = plt.figure(figsize=(10, 7))
-    ax = fig.add_subplot(111, projection="3d")
-    plot_prism(ax, V)
-
-    ax.set_xlabel("x (nm)")
-    ax.set_ylabel("y (nm)")
-    ax.set_zlabel("z (nm)")
-    ax.set_title(f"θ={theta_deg:.1f}°, φ={phi_deg:.2f}°, ψ={psi_deg:.2f}°, t={t:.1f} nm")
-
-    ranges = V.max(axis=0) - V.min(axis=0)
-    max_range = ranges.max()
-    centers = V.min(axis=0) + ranges / 2
+def plot_prism_3d_styled_edges(vertices: np.ndarray, view: View):
+    """
+    Plot the prism in 3D with edges styled based on adjacent faces:
+    - Solid edges: between two blue faces OR between blue and red faces
+    - Dashed edges: between two red faces
+    """
+    fig = plt.figure(figsize=(12, 10))
+    ax = fig.add_subplot(111, projection='3d')
+    
+    # Calculate camera direction vector
+    right, up, forward = camera_axes_from_mpl(view.elev, -view.azim)
+    
+    # Calculate dot product for each face to determine if blue or red
+    face_colors_map = []  # True for blue (positive dot), False for red (negative dot)
+    
+    for i, face_indices in enumerate(FACES):
+        normal, _ = calculate_face_normal(vertices, face_indices)
+        dot_product = np.dot(normal, forward)
+        is_blue = dot_product > 0
+        face_colors_map.append(is_blue)
+    
+    # Create edge-to-faces mapping
+    edge_to_faces = edges_to_faces_map(FACES)
+    edges = unique_edges_from_faces(FACES)
+    
+    # Prepare edges with styling
+    solid_edges = []
+    dashed_edges = []
+    
+    for edge in edges:
+        v1, v2 = edge
+        # Find which faces this edge belongs to
+        face_indices = edge_to_faces.get(edge, [])
+        
+        if len(face_indices) == 2:
+            # Edge between two faces
+            face1_blue = face_colors_map[face_indices[0]]
+            face2_blue = face_colors_map[face_indices[1]]
+            
+            # Solid if: (blue, blue) or (blue, red) or (red, blue)
+            # Dashed if: (red, red)
+            if not face1_blue and not face2_blue:
+                # Both red -> dashed
+                dashed_edges.append(edge)
+            else:
+                # At least one blue -> solid
+                solid_edges.append(edge)
+        else:
+            solid_edges.append(edge)  # Default to solid
+    
+    # Draw faces (semi-transparent)
+    face_polygons = []
+    for face_indices in FACES:
+        face_verts = vertices[face_indices]
+        face_polygons.append(face_verts)
+    
+    face_collection = Poly3DCollection(
+        face_polygons,
+        facecolors=(0.8, 0.8, 0.8, 0.3),  # Light gray, very transparent
+        edgecolors='none',  # No face edges, we'll draw them separately
+        alpha=0.3
+    )
+    ax.add_collection3d(face_collection)
+    
+    # Draw solid edges
+    for edge in solid_edges:
+        v1, v2 = edge
+        ax.plot3D(
+            [vertices[v1, 0], vertices[v2, 0]],
+            [vertices[v1, 1], vertices[v2, 1]],
+            [vertices[v1, 2], vertices[v2, 2]],
+            color='black',
+            linewidth=2.0,
+            solid_capstyle='round'
+        )
+    
+    # Draw dashed edges
+    for edge in dashed_edges:
+        v1, v2 = edge
+        ax.plot3D(
+            [vertices[v1, 0], vertices[v2, 0]],
+            [vertices[v1, 1], vertices[v2, 1]],
+            [vertices[v1, 2], vertices[v2, 2]],
+            color='black',
+            linewidth=1.5,
+            linestyle='--',
+            dashes=(5, 3)
+        )
+    
+    # Set equal aspect ratio and limits
+    mins = vertices.min(axis=0)
+    maxs = vertices.max(axis=0)
+    ranges = maxs - mins
+    max_range = float(np.max(ranges))
+    centers = mins + ranges / 2.0
+    
     ax.set_box_aspect([1, 1, 1])
-    ax.set_xlim(centers[0] - max_range / 2, centers[0] + max_range / 2)
-    ax.set_ylim(centers[1] - max_range / 2, centers[1] + max_range / 2)
-    ax.set_zlim(centers[2] - max_range / 2, centers[2] + max_range / 2)
-
-    ax.view_init(elev=90 - theta_deg, azim=phi_deg)
+    ax.set_xlim(centers[0] - max_range/2, centers[0] + max_range/2)
+    ax.set_ylim(centers[1] - max_range/2, centers[1] + max_range/2)
+    ax.set_zlim(centers[2] - max_range/2, centers[2] + max_range/2)
+    
+    ax.set_xlabel('x (nm)', fontsize=12)
+    ax.set_ylabel('y (nm)', fontsize=12)
+    ax.set_zlabel('z (nm)', fontsize=12)
+    ax.set_title(f'Prism with Styled Edges\n(Solid=blue-blue or blue-red, Dashed=red-red)\n(azim={view.azim:.1f}°, elev={view.elev:.1f}°)', 
+                 fontsize=14, fontweight='bold')
+    
+    ax.view_init(elev=view.elev, azim=view.azim)
     plt.tight_layout()
-    plt.show()
+    return fig, ax
+
+
+def visualize_prism(Wt: float, Wb: float, t: float, L: float, 
+                    theta_deg: float, phi_deg: float, psi_deg: float,
+                    show_2d: bool = True, show_3d: bool = True, debug: bool = False):
+    """
+    Visualize the prism using the sophisticated visualization from visualize_structure.py.
+    
+    Args:
+        Wt, Wb, t, L: Prism dimensions
+        theta_deg: Tilt angle (elevation)
+        phi_deg: True azimuth (azimuth)
+        psi_deg: Image line angle (for title only)
+        show_2d: Whether to show 2D projection
+        show_3d: Whether to show 3D view
+        debug: Whether to print debug info
+    """
+    dims = PrismDims(Wt=Wt, Wb=Wb, t=t, L=L)
+    # Convert theta (tilt) to elevation, phi (azimuth) to azimuth
+    # In matplotlib: elev is angle from horizontal plane, azim is rotation about z-axis
+    view = View(azim=phi_deg, elev=theta_deg, mode='ortho')
+    
+    if show_2d:
+        # Regular plot with title and axes
+        fig2d, ax2d = plt.subplots(figsize=(8, 8))
+        plot_prism_2d(ax2d, dims, view, debug=debug, clean_export=False)
+        ax2d.set_title(f"2D projection — ortho (azim={phi_deg:.1f}°, elev={theta_deg:.1f}°)\n"
+                      f"Face-based hidden-line removal | t={t:.1f} nm")
+        fig2d.tight_layout()
+        plt.savefig('prism_2d_projection.png', dpi=150, bbox_inches='tight')
+        print("Saved prism_2d_projection.png")
+        plt.show()
+        
+        # Clean SVG export - only the projection lines, no axes/labels/title
+        fig2d_clean, ax2d_clean = plt.subplots(figsize=(8, 8))
+        plot_prism_2d(ax2d_clean, dims, view, debug=debug, clean_export=True)
+        fig2d_clean.tight_layout()
+        # For clean export, use transparent background and tight padding
+        fig2d_clean.patch.set_facecolor('none')  # Transparent figure background
+        plt.savefig('prism_2d_projection.svg', bbox_inches='tight', 
+                   pad_inches=0, facecolor='none', transparent=True)
+        print("Saved prism_2d_projection.svg (clean, lines only)")
+        plt.close(fig2d_clean)  # Close the clean figure without showing
+    
+    if show_3d:
+        V = prism_vertices(dims)
+        fig3d, ax3d = plot_prism_3d_styled_edges(V, view)
+        ax3d.set_title(f"3D Prism Visualization\n"
+                      f"θ={theta_deg:.1f}°, φ={phi_deg:.2f}°, ψ={psi_deg:.2f}°, t={t:.1f} nm",
+                      fontsize=14, fontweight='bold')
+        plt.savefig('prism_3d.png', dpi=150, bbox_inches='tight')
+        print("Saved prism_3d.png")
+        plt.show()
 
 
 # =============================================================================
@@ -505,7 +906,7 @@ def visualize_3d(Wt: float, Wb: float, t: float, L: float,
 # =============================================================================
 
 def main():
-    ap = argparse.ArgumentParser(description="Scale-free thickness extraction from tilted SEM (v4)")
+    ap = argparse.ArgumentParser(description="Scale-free thickness extraction from tilted SEM (v2 with advanced visualization)")
     ap.add_argument("--image", default="cavity_sem_45degree.png", help="SEM image path")
     ap.add_argument("--wt", type=float, default=238.0, help="Top width Wt (nm)")
     ap.add_argument("--wb", type=float, default=314.0, help="Bottom width Wb (nm)")
@@ -522,6 +923,10 @@ def main():
 
     ap.add_argument("--no-plots", action="store_true", help="Disable plots")
     ap.add_argument("--debug", action="store_true", help="Enable debug output")
+    
+    # Visualization options
+    ap.add_argument("--no-2d", action="store_true", help="Disable 2D projection plot")
+    ap.add_argument("--no-3d", action="store_true", help="Disable 3D visualization")
     
     # Line detection parameters
     ap.add_argument("--hough-threshold", type=int, default=40, help="HoughLinesP threshold")
@@ -638,7 +1043,15 @@ def main():
         fits = debug_info["fits"]
         labeling = dbg["chosen_indices"]
         plot_overlay(gray, fits, args.theta, phi_deg, psi_deg, t_nominal, labeling, debug_info)
-        visualize_3d(args.wt, args.wb, abs(t_nominal), args.length, args.theta, phi_deg, psi_deg)
+        
+        # Use the sophisticated prism visualization
+        visualize_prism(
+            args.wt, args.wb, abs(t_nominal), args.length,
+            args.theta, phi_deg, psi_deg,
+            show_2d=not args.no_2d,
+            show_3d=not args.no_3d,
+            debug=args.debug
+        )
 
 
 if __name__ == "__main__":
