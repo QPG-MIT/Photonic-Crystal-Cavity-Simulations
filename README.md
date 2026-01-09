@@ -5,6 +5,31 @@ pipelines for photonic crystal cavity work. It combines several self-contained
 analyses (SEM image processing, FDTD simulations, thickness estimation, and
 statistical fitting) that previously lived in separate folders.
 
+## Documentation
+
+For detailed descriptions of the methods, algorithms, and theoretical derivations
+used in this repository, see [`Extended_Information.pdf`](Extended_Information.pdf).
+This document provides:
+
+- **SEM Image Analysis**: Detailed descriptions of the computer vision pipeline for
+  extracting geometric parameters (waveguide width, hole radius, thickness) from
+  scanning electron microscope images, including preprocessing, edge detection, and
+  robust fitting algorithms.
+
+- **FDTD Simulations**: Methodology for electromagnetic simulations using Tidy3D,
+  including simulation setup, boundary conditions, and Q-factor extraction using
+  Prony's method.
+
+- **Sensitivity Analysis and Surrogate Modeling**: Construction of polynomial
+  surrogate models relating geometric parameters to resonance wavelength, with
+  Sobol sequence sampling and cross-validation.
+
+- **Inverse Monte Carlo**: Statistical framework for estimating cavity thickness
+  distributions from measured resonance wavelengths and geometric parameters.
+
+The supplementary material includes mathematical derivations, coordinate system
+transformations, and validation results that complement the codebase.
+
 ## Getting started
 
 1. **Create an environment** with Python 3.11+ and install dependencies:
